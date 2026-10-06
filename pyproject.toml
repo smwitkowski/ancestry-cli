@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ancestry-cli"
+version = "0.1.0"
+description = "Read and edit an Ancestry.com family tree from the command line, through your own signed-in Chrome"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = ["websockets>=14", "Pillow>=10.4"]
+
+[project.scripts]
+ancestry = "ancestry_cli.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=9.1.1"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
