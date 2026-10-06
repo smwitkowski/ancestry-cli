@@ -124,5 +124,7 @@ def person(*, tree_id, person_id, include_living=False):
                   "place_id": gpid(f.get("PlaceGpids")) or None, "preferred": not f.get("IsAlternate"),
                   "description": f.get("Description"), "source_count": len(str(f.get("SourceCitationIDs") or "").split())}
                  for f in snap["facts"] if f.get("AssertionId")]
-        return {**base, "name": snap["name"], "facts": facts, "sources": len(snap["sources"]), "family": family}
+        return {**base, "name": snap["name"], "facts": facts, "sources": len(snap["sources"]),
+                "citations": [{"citation_id": str(s["CitationId"]), "source_id": s.get("SourceId"), "custom": s.get("custom", False),
+                               "title": s.get("Title")} for s in snap["sources"] if s.get("CitationId")], "family": family}
     return guarded(run)

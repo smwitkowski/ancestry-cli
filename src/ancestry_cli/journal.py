@@ -188,6 +188,8 @@ def command(*, action, entry_id=None, dry_run=True, all_entries=False, resolve_a
         results.append({**step, "ok": out.get("ok"), "status": out.get("status")})
         if out.get("ok"):
             _append({"undo_of": r["id"], "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())})
+            if out.get("journal_id"):       # the undo's own write must not show up as something else to undo
+                _append({"resolved": out["journal_id"], "as": "ok", "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())})
     live = [x for x in results if "skipped" not in x and not x.get("dry_run")]
     out = {"ok": all(x.get("ok", True) for x in results if "skipped" not in x), "classification": "undo-dry-run" if dry_run else "undone",
            "results": results}
