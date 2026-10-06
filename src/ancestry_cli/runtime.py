@@ -116,6 +116,16 @@ ERRORS = {
     "newspapers-check-required": Err(False, True, "Newspapers.com is showing its bot check. Pass it by hand in that tab, then retry.", [_human("Pass the Newspapers.com check in its tab.")]),
     "newspapers-sign-in-required": Err(False, True, "The Newspapers.com tab is not signed in. Sign in by hand (Ancestry sign-in works), then retry.", [_human("Sign in to Newspapers.com in its tab.")]),
     "newspapers-unavailable": Err(True, False, "Newspapers.com did not return the page (see status). Check the page id.", [_edit("Check the page id.")]),
+    "familysearch-chrome-not-running": Err(False, True, "No Chrome is listening for FamilySearch (default port 9223, set FAMILYSEARCH_CLI_PORT). Start one with --remote-debugging-port and sign in to familysearch.org by hand.", [_human("Start the FamilySearch Chrome and sign in."), _run("familysearch", "doctor", when="after-human")]),
+    "familysearch-tab-required": Err(False, True, "The FamilySearch Chrome needs exactly one tab, on www.familysearch.org. This tool never opens or navigates tabs.", [_human("Put one tab on www.familysearch.org."), _run("familysearch", "doctor", when="after-human")]),
+    "familysearch-tab-ambiguous": Err(False, True, "More than one tab is on www.familysearch.org; leave exactly one.", [_human("Close the extra FamilySearch tabs.")]),
+    "familysearch-sign-in-required": Err(False, True, "FamilySearch is signed out. Sign in by hand in that Chrome tab; this tool never types credentials.", [_human("Sign in to FamilySearch in the Chrome tab."), _run("familysearch", "doctor", when="after-human")]),
+    "familysearch-check-required": Err(False, True, "FamilySearch is showing a bot check. Do not retry; pass it by hand in the tab, then run `familysearch doctor`.", [_human("Pass the FamilySearch check in the tab."), _run("familysearch", "doctor", when="after-human")]),
+    "familysearch-rate-limited": Err(True, False, "FamilySearch is rate-limiting. Wait a few minutes before retrying.", [_RETRY]),
+    "familysearch-not-found": Err(False, False, "FamilySearch has nothing at that identifier (or you may not see it). Check the ARK, PID, film or image number.", [_edit("Check the identifier.")]),
+    "familysearch-unavailable": Err(True, False, "FamilySearch did not return the data (see status). Retry once; if it repeats run `familysearch doctor`.", [_RETRY, _run("familysearch", "doctor")]),
+    "familysearch-image-restricted": Err(False, False, "This image is not viewable with this account (see permission). Nothing was saved.", []),
+    "invalid-request": Err(False, False, "A value is invalid; see problems for the field.", [_edit("Fix the listed fields.")]),
     "fact-not-found": Err(False, False, "That assertion id is not on this person. Use `ancestry person` to list fact ids.", [_run("ancestry", "person", "--tree", "{tree_id}", "--person", "{person_id}")]),
     "invalid-media-file": Err(False, False, "Use an absolute path to a png, jpg, gif or webp file up to 25 MB.", [_edit("Use an absolute path to a png, jpg, gif or webp file up to 25 MB.")]),
     "unknown-tag": Err(False, False, "Unknown tag name. Use a listed tag name or its numeric id.", [_edit("Use a tag name from `did_you_mean`, or a numeric tag id.")]),
@@ -266,10 +276,11 @@ class Lease:
     bridge: object
     target_id: str = ""
     origin: str = ORIGIN            # the site this lease drives; tabs on other sites are ignored
+    port: int = 0                   # a different Chrome than the Ancestry one (0 = the configured port)
 
     @property
     def base(self):
-        return f"http://127.0.0.1:{config.port()}"
+        return f"http://127.0.0.1:{self.port or config.port()}"
 
     def _all(self):
         try:
@@ -342,19 +353,20 @@ def lane_reset(bridge=None):
 
 
 @contextlib.contextmanager
-def lock(service="ancestry"):
-    """Cross-process exclusive lock plus pacing, per Chrome port: concurrent runs never overlap or burst."""
-    until = breaker_until()
+def lock(service="ancestry", *, path=None, interval=None):
+    """Cross-process exclusive lock plus pacing, per Chrome port: concurrent runs never overlap or burst.
+    `path` and `interval` let another site's tool use its own lock file and spacing (and skip the Ancestry challenge breaker)."""
+    until = None if path else breaker_until()
     if until:
         raise LaneError("bot-challenge-block")
-    path = config.lock_file()
+    path = path or config.lock_file()
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "a+") as handle:
         fcntl.flock(handle, fcntl.LOCK_EX)
         try:
             handle.seek(0)
             last = float(handle.read().strip() or 0)
-            delay = last + MIN_INTERVAL - time.time()
+            delay = last + (MIN_INTERVAL if interval is None else interval) - time.time()
             if delay > 0:
                 time.sleep(delay)
             yield

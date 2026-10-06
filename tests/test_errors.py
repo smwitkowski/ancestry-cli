@@ -93,7 +93,11 @@ def test_every_next_action_is_a_real_command_and_actionable_codes_have_one():
         for action in err.actions:
             assert action["kind"] in ("run", "retry", "human", "edit-args"), code
             if action["kind"] == "run":
-                assert action["argv"][0] == "ancestry", code
+                assert action["argv"][0] in ("ancestry", "familysearch"), code
+                if action["argv"][0] == "familysearch":
+                    from ancestry_cli import familysearch
+                    familysearch.build_parser().parse_args(action["argv"][1:])
+                    continue
                 _argv_parses(rt.annotate({"ok": False, "classification": code, "journal_id": 1, "tree_id": 1, "person_id": 2,
                                           "op": "fact-add", "missing": "k"})["next_actions"][err.actions.index(action)]["argv"])
             else:

@@ -68,6 +68,16 @@ Exit codes: `0` ok, `1` failed with nothing changed, `2` bad usage, `3` state un
 | `newspapers-check-required` | no | yes | Newspapers.com is showing its bot check. Pass it by hand in that tab, then retry. | human: Pass the Newspapers.com check in its tab. |
 | `newspapers-sign-in-required` | no | yes | The Newspapers.com tab is not signed in. Sign in by hand (Ancestry sign-in works), then retry. | human: Sign in to Newspapers.com in its tab. |
 | `newspapers-unavailable` | yes | no | Newspapers.com did not return the page (see status). Check the page id. | edit-args: Check the page id. |
+| `familysearch-chrome-not-running` | no | yes | No Chrome is listening for FamilySearch (default port 9223, set FAMILYSEARCH_CLI_PORT). Start one with --remote-debugging-port and sign in to familysearch.org by hand. | human: Start the FamilySearch Chrome and sign in.<br>run: `familysearch doctor` *(after-human)* |
+| `familysearch-tab-required` | no | yes | The FamilySearch Chrome needs exactly one tab, on www.familysearch.org. This tool never opens or navigates tabs. | human: Put one tab on www.familysearch.org.<br>run: `familysearch doctor` *(after-human)* |
+| `familysearch-tab-ambiguous` | no | yes | More than one tab is on www.familysearch.org; leave exactly one. | human: Close the extra FamilySearch tabs. |
+| `familysearch-sign-in-required` | no | yes | FamilySearch is signed out. Sign in by hand in that Chrome tab; this tool never types credentials. | human: Sign in to FamilySearch in the Chrome tab.<br>run: `familysearch doctor` *(after-human)* |
+| `familysearch-check-required` | no | yes | FamilySearch is showing a bot check. Do not retry; pass it by hand in the tab, then run `familysearch doctor`. | human: Pass the FamilySearch check in the tab.<br>run: `familysearch doctor` *(after-human)* |
+| `familysearch-rate-limited` | yes | no | FamilySearch is rate-limiting. Wait a few minutes before retrying. | retry: retry the same command |
+| `familysearch-not-found` | no | no | FamilySearch has nothing at that identifier (or you may not see it). Check the ARK, PID, film or image number. | edit-args: Check the identifier. |
+| `familysearch-unavailable` | yes | no | FamilySearch did not return the data (see status). Retry once; if it repeats run `familysearch doctor`. | retry: retry the same command<br>run: `familysearch doctor` |
+| `familysearch-image-restricted` | no | no | This image is not viewable with this account (see permission). Nothing was saved. |  |
+| `invalid-request` | no | no | A value is invalid; see problems for the field. | edit-args: Fix the listed fields. |
 | `fact-not-found` | no | no | That assertion id is not on this person. Use `ancestry person` to list fact ids. | run: `ancestry person --tree {tree_id} --person {person_id}` |
 | `invalid-media-file` | no | no | Use an absolute path to a png, jpg, gif or webp file up to 25 MB. | edit-args: Use an absolute path to a png, jpg, gif or webp file up to 25 MB. |
 | `unknown-tag` | no | no | Unknown tag name. Use a listed tag name or its numeric id. | edit-args: Use a tag name from `did_you_mean`, or a numeric tag id. |

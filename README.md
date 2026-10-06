@@ -69,6 +69,11 @@ see what can be written. Every command prints one JSON object; follow `state` an
 | [docs/error-roadmap.md](docs/error-roadmap.md) | how errors are designed for agents, and what was built |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | adding an operation, running tests |
 
+## FamilySearch (read-only)
+
+The package also installs `familysearch`, which reads FamilySearch records, tree persons, film catalog entries and record images through a
+second Chrome on port 9223. See [docs/familysearch.md](docs/familysearch.md).
+
 ## Commands at a glance
 
 `doctor` · `whoami [--pin]` · `trees` · `find` · `person` · `read` (search, hints, record, any known read) · `collections` (find, describe, list) · `sources` · `match` · `newspapers` · `apply` · `hint list|accept` ·
