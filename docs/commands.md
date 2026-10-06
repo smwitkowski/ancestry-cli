@@ -51,6 +51,13 @@ call_number, refn, note and repository_id; `write repository-create` makes a rep
 `write source-set-repository` links one; `write citation-add` and `citation-edit` take date, other_info, transcription and url.
 `citation-edit` replaces every citation field (omitted ones are cleared); `source-edit` keeps fields you do not give.
 
+### `ancestry apply --manifest FILE [--live]`
+Runs a batch of writes from a JSON file: `{"tree": "alias or id", "confirm_tree": id (outside sandbox trees), "operations":
+[{"op": "fact-add", "person": 111, "assertion": 222, "set": {"eventType": "Birth", "date": "1900"}}]}`. Without `--live` every step is
+validated and nothing is sent. With `--live` the first step is the canary: if it is rejected or changes nothing the batch stops.
+Later steps stop at the first failure or unknown outcome (exit 3: do not retry; `journal verify`). Each result (ok, state,
+journal_id, ids, readback) is appended to the manifest's `receipt`; re-running skips steps already recorded as ok.
+
 ### `ancestry collections find|describe|list`
 Record collections. Ancestry publishes no full list, so this has three parts:
 - `find [--given G] --surname S [--birth Y] [--location L] [--keyword WORD] [--category C]`: collections with hits for a person

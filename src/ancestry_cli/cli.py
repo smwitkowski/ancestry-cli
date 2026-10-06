@@ -133,6 +133,10 @@ def build_parser():
     p.add_argument("--person", dest="person_id", type=int, help="optional if the account is pinned (`whoami --pin`)")
     p.add_argument("--query", help="words that must all appear in the title")
 
+    p = subs.add_parser("apply", help="run a JSON manifest of writes: validate all, canary first, stop on a problem, write a receipt", allow_abbrev=False)
+    p.add_argument("--manifest", required=True)
+    p.add_argument("--live", action="store_true", help="send for real (default: validate only)")
+
     p = subs.add_parser("hint", help="list a person's hints or accept one", allow_abbrev=False)
     p.add_argument("action", choices=("list", "accept"))
     _tree_arg(p, True)
@@ -220,6 +224,9 @@ def _run(command, args):
     if command == "init":
         from .setup import init
         return init()
+    if command == "apply":
+        from .apply import apply as apply_manifest
+        return apply_manifest(manifest=args["manifest"], live=args["live"])
     if command == "sources":
         from .sources import find as find_sources
         return find_sources(tree_id=args["tree_id"], person_id=args["person_id"], query=args["query"])

@@ -75,3 +75,24 @@ def test_source_and_citation_field_builders():
     r = ops.build("citation-edit", tree_id=5, person_id=7, citation_id="4", title="T", source_id="3", transcription="x", actor="g")
     assert r["method"] == "PUT" and r["body"]["trans"] == "x"
     assert ops.build("repository-create", tree_id=5, person_id=7, name="R", address="a", actor="g")["body"]["adr"] == "a"
+
+
+def test_apply_canary_stops_and_receipt(tmp_path, monkeypatch):
+    import json
+    from ancestry_cli import apply as ap, ops
+    calls = []
+
+    def fake(**kw):
+        calls.append(kw)
+        if kw["dry_run"]:
+            return {"ok": True}
+        return {"ok": len(calls) < 5, "state": "changed", "classification": "sent", "journal_id": len(calls)}
+    monkeypatch.setattr(ops, "write", fake)
+    m = tmp_path / "m.json"
+    m.write_text(json.dumps({"tree": 5, "operations": [{"op": "fact-add", "person": 1, "set": {"a": "b"}} for _ in range(3)]}))
+    out = ap.apply(manifest=str(m))
+    assert out["classification"] == "apply-dry-run" and not [c for c in calls if not c["dry_run"]]
+    out = ap.apply(manifest=str(m), live=True)
+    assert out["ok"] and [r["index"] for r in json.loads(m.read_text())["receipt"]] == [0, 1, 2]
+    live_calls = len([c for c in calls if not c["dry_run"]])
+    assert ap.apply(manifest=str(m), live=True)["ok"] and len([c for c in calls if not c["dry_run"]]) == live_calls   # resume skips done steps
