@@ -16,8 +16,10 @@ from . import config
 
 SNAPSHOT_OPS = frozenset(("fact-edit", "fact-remove", "person-remove", "weblink-remove", "citation-remove",
                           "media-remove", "fact-detach-source", "fact-attach-source", "note-set"))
-_FACT_KEYS = ("AssertionId", "Type", "TypeString", "Title", "Date", "Place", "Description", "SourceCitationIDs")
-_FIELDS = ("TypeString", "Date", "Place", "Description", "SourceCitationIDs")
+_FACT_KEYS = ("AssertionId", "Type", "TypeString", "Title", "Date", "Place", "PlaceGpids", "IsAlternate", "HasCustomTitle",
+              "Description", "SourceCitationIDs")
+_FIELDS = ("TypeString", "Date", "Place", "PlaceGpids", "IsAlternate", "Description", "SourceCitationIDs")
+_GPID_ORDER = ("CityId", "TownshipId", "CountyId", "StateId", "CountryId")      # most specific first
 
 
 class SnapshotError(ValueError):
@@ -67,6 +69,15 @@ def diff(before, after):
             "name_changed": before.get("name") != after.get("name")}
 
 
+def gpid(place_gpids):
+    """The place id the site stores for a fact: the most specific non-zero id in PlaceGpids (verified against LifeEvents)."""
+    if isinstance(place_gpids, dict):
+        for key in _GPID_ORDER:
+            if place_gpids.get(key):
+                return str(place_gpids[key])
+    return ""
+
+
 def restore_fields(snapshot, assertion_id):
     """Fact fields that put one fact back as it was (used as the inverse of fact-edit / fact-remove)."""
     f = _facts(snapshot).get(str(assertion_id))
@@ -76,5 +87,5 @@ def restore_fields(snapshot, assertion_id):
     out = {"eventType": f["TypeString"], "date": f.get("Date") or "", "description": f.get("Description") or "",
            "gender": gender if isinstance(gender, str) else ""}
     if f.get("Place"):
-        out["location"] = {"placeName": f["Place"], "GPID": "", "showUnderline": False}
+        out["location"] = {"placeName": f["Place"], "GPID": gpid(f.get("PlaceGpids")), "showUnderline": False}
     return out

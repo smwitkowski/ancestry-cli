@@ -5,6 +5,7 @@ import datetime
 
 from . import config
 from .runtime import get_json, guarded, session
+from .snapshots import gpid
 
 _YEAR = datetime.date.today().year
 _REDACTED = "Living person (redacted)"
@@ -120,6 +121,7 @@ def person(*, tree_id, person_id, include_living=False):
                                      "life_range": None if m.get("IsLiving") and not include_living else m.get("LifeRange")}
                                     for m in members if isinstance(m, dict)]
         facts = [{"assertion_id": str(f["AssertionId"]), "type": f.get("TypeString"), "date": f.get("Date"), "place": f.get("Place"),
+                  "place_id": gpid(f.get("PlaceGpids")) or None, "preferred": not f.get("IsAlternate"),
                   "description": f.get("Description"), "source_count": len(str(f.get("SourceCitationIDs") or "").split())}
                  for f in snap["facts"] if f.get("AssertionId")]
         return {**base, "name": snap["name"], "facts": facts, "sources": len(snap["sources"]), "family": family}

@@ -188,5 +188,9 @@ def command(*, action, entry_id=None, dry_run=True, all_entries=False, resolve_a
         results.append({**step, "ok": out.get("ok"), "status": out.get("status")})
         if out.get("ok"):
             _append({"undo_of": r["id"], "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())})
-    return {"ok": all(x.get("ok", True) for x in results if "skipped" not in x), "classification": "undo-dry-run" if dry_run else "undone",
-            "results": results}
+    live = [x for x in results if "skipped" not in x and not x.get("dry_run")]
+    out = {"ok": all(x.get("ok", True) for x in results if "skipped" not in x), "classification": "undo-dry-run" if dry_run else "undone",
+           "results": results}
+    if live:        # the same state words a write uses: did anything change, did a step fail
+        out["state"] = "changed" if any(x.get("ok") for x in live) else "unchanged"
+    return out
