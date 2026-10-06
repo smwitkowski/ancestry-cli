@@ -339,6 +339,11 @@ def film(dgs):
 
 
 # ------------------------------------------------------------------------------------------------ images
+def _viewable(permission):
+    """The permission endpoint answers with a colon list such as `A:ThemisPrmAnyone:B`; `Anyone` in it means any signed-in user may view."""
+    return bool(set(permission.split(":")) & {"ThemisPrmAnyone", "ThemisPrmSignedInUser", "ThemisPrmMember"})
+
+
 def _levels(width, height):
     return math.ceil(math.log2(max(width, height, 1)))
 
@@ -402,7 +407,7 @@ def image(*, out, film_dgs=None, number=None, ark=None, das=None, crop=None, max
         perm, meta = fetch([{"method": "GET", "path": f"/service/records/storage/dascloud/das/v2/{das_id}/permission", "accept": "text/plain"},
                             {"method": "GET", "path": f"{d}/image.xml", "accept": "application/xml"}])
         permission = (perm.get("text") or "").strip()
-        if permission and permission not in ("ThemisPrmAnyone", "ThemisPrmSignedInUser", "ThemisPrmMember"):
+        if permission and not _viewable(permission):
             raise LaneError("familysearch-image-restricted", permission=permission[:60])
         size = re.search(r'Width="(\d+)"\s+Height="(\d+)"', meta.get("text") or "")
         if not size:

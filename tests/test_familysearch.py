@@ -52,3 +52,8 @@ def test_bad_identifiers_are_usage_errors_and_nothing_is_sent():
     assert fs.record("not-an-ark")["classification"] == "invalid-request"
     assert fs.person("lower")["classification"] == "invalid-request"
     assert fs.film("12x")["classification"] == "invalid-request"
+
+
+def test_permission_lists_grant_when_anyone_is_in_them():
+    assert fs._viewable("ThemisPrmAncestry:ThemisPrmAnyone:ThemisPrmFindMyPast") and fs._viewable("ThemisPrmAnyone")
+    assert not fs._viewable("ThemisPrmAncestry:ThemisPrmFindMyPast")
