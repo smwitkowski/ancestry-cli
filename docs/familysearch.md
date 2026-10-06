@@ -20,6 +20,9 @@ If FamilySearch shows a bot check, the command stops with `familysearch-check-re
 | `familysearch person PID [--sources]` | a family-tree person: facts, parents, spouses and children with PIDs, attached sources |
 | `familysearch film DGS` | catalog entry of a digital film: title, dates, place, image count, the films' contents |
 | `familysearch catalog --place P [--subject-id ID] [--years A-B] [--films] [--exact] [--limit N]` | the catalog by place: record types, then titles, then films with DGS numbers |
+| `familysearch locate --film DGS [--type baptisms\|marriages\|burials\|births\|deaths] (--date YYYY[-MM[-DD]] \| --years A-B) [--name N] [--probes K]` | which images of a film to look at for a date, by sampling the film's indexed records |
+| `familysearch film DGS --sheet --from N --to M --step K --out FILE` | contact sheet of numbered thumbnails (at most 48) |
+| `familysearch waypoints --collection C [--waypoint ID] [--query WORDS]` | browse a browsable collection (state, county, district) down to image ARKs |
 | `familysearch image (--record 1:1:X \| --film DGS --image N \| --ark 3:1:X \| --das TH-...) --out FILE [--crop x,y,w,h] [--max-tiles N]` | save a record image, optionally cropped |
 
 Notes:
@@ -35,4 +38,10 @@ Notes:
   `--subject-id` for the titles (`--years` keeps overlapping dates, `--films` adds each title's films with DGS and contents, one request
   each). The place is matched as containing the text unless `--exact`; use the catalog's own wording (for example
   `Germany, Bayern, Rockenhausen`) with `--exact` for one place. Feed a DGS number to `film` and `image`.
-- Not covered yet: walking a film's records by place and date.
+- `locate` samples about 10 images spread over the film, reads the indexed records on each (type, date, names) and bisects toward the
+  target date, up to `--probes` images (about 3 s each). It returns `candidates` (an image range, how it was derived) and the `anchors` it used.
+  It only works where the film's images have indexed records; on an unindexed film it says so and the contact sheet (`film --sheet`) is the
+  fallback: look at every Kth image, narrow the range, repeat. `--name` stops at the first indexed page that has all the words in a name.
+  `sections` is the film's contents text split into parts; FamilySearch does not publish image ranges for them.
+- `waypoints` starts at the collection's top level (`--collection C`), then pass a child's `waypoint` id back with `--waypoint`. A leaf
+  lists `images` (3:1: ARKs) for `image --ark`.

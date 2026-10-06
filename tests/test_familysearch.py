@@ -73,3 +73,31 @@ def test_catalog_inputs_and_title_years():
     assert fs.catalog(place="Rockenhausen", years="abc")["classification"] == "invalid-request"
     fs._check({"path": "/service/search/catalog/item/olib:1485663"})
     fs._check({"path": "/service/search/catalog/v3/search?count=20&q.place=Rockenhausen&q.subjectId=133492089"})
+
+
+def test_dates_as_written_in_registers():
+    assert fs._date_key("10. September 1843") == (1843, 9, 10)
+    assert fs._date_key("1 Nov 1846") == (1846, 11, 1)
+    assert fs._date_key("März 1850") == (1850, 3, 0) and fs._date_key("1846") == (1846, 0, 0) and fs._date_key("undated") is None
+    assert fs._target("1846-11-01", None) == (fs._flat((1846, 11, 1)),) * 2
+    lo, hi = fs._target(None, "1840-1850")
+    assert lo == fs._flat((1840, 0, 0)) and hi == fs._flat((1850, 12, 31))
+
+
+def test_film_sections_come_from_the_contents_text():
+    data = {"dgsNum": "5", "catalogs": [{"data": {"film_note": [{"digital_film_no": "5", "text": "Heiraten 1798-1839 -- Familien-Verzeichnis -- Taufen 1839-1868"}]}}]}
+    assert fs._sections(data) == [{"label": "Heiraten 1798-1839", "years": [1798, 1839]}, {"label": "Familien-Verzeichnis", "years": None},
+                                  {"label": "Taufen 1839-1868", "years": [1839, 1868]}]
+
+
+def test_locate_bisects_to_the_bracket(monkeypatch):
+    # 400 images; baptism dates rise one month per ten images from 1840 (March 1842 is images 260-269)
+    def fake_probe(arks, n):
+        y, m = 1840 + (n // 10) // 12, 1 + (n // 10) % 12
+        return {"image": n, "records": 1, "names": [], "events": [{"type": "Baptism", "date": f"5 {m} {y}", "key": (y, m, 5), "name": "X"}]}
+    monkeypatch.setattr(fs, "_probe", fake_probe)
+    monkeypatch.setattr(fs, "_film_data", lambda dgs: ({"dgsNum": str(dgs)}, [f"3:1:A-{i}" for i in range(400)]))
+    monkeypatch.setattr(fs, "_guard", lambda fn: fn())
+    out = fs.locate(film_dgs="5", type_="baptisms", date="1842-03-05", probes=16)
+    c = out["candidates"][0]
+    assert c["from"] <= 265 <= c["to"] and c["to"] - c["from"] <= 40 and out["probes"] <= 16

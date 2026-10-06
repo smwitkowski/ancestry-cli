@@ -11,6 +11,9 @@ Reads only: FamilySearch tree writes are out of scope.
   familysearch person PID [--sources]
   familysearch film DGS              (catalog entry and image count of a digital film)
   familysearch catalog --place P [--subject-id ID] [--years A-B] [--films] [--exact]   (what the catalog holds for a place)
+  familysearch locate --film DGS [--type baptisms|marriages|burials|births|deaths] (--date YYYY[-MM[-DD]] | --years A-B) [--name N] [--probes K]
+  familysearch film DGS --sheet --from N --to M --step K --out FILE   (contact sheet)
+  familysearch waypoints --collection C [--waypoint ID] [--query WORDS]   (browse state, county, district to images)
   familysearch image (--film DGS --image N | --ark 3:1:XXXX | --das TH-...) --out FILE [--crop x,y,w,h] [--max-tiles N]
 """
 from __future__ import annotations
@@ -48,9 +51,11 @@ _ALLOWED = [
     re.compile(r"/service/search/catalog/v3/search\?[A-Za-z0-9.%+=&_-]{1,600}\Z"),
     re.compile(r"/service/search/catalog/item/[a-z]{2,8}:[0-9]{1,12}\Z"),
     re.compile(r"/platform/tree/persons/[A-Z0-9-]{1,12}(?:/(?:parents|spouses|children|sources))?\Z"),
-    re.compile(r"/service/records/storage/dascloud/das/v2/TH-[0-9A-Za-z-]{1,60}/(?:permission|thumb_p200\.jpg)\Z"),
-    re.compile(r"/service/records/storage/deepzoomcloud/dz/v1/TH-[0-9A-Za-z-]{1,60}/image\.xml\Z"),
-    re.compile(r"/service/records/storage/deepzoomcloud/dz/v1/TH-[0-9A-Za-z-]{1,60}/image_files/[0-9]{1,2}/[0-9]{1,3}_[0-9]{1,3}\.jpg\Z"),
+    re.compile(r"/service/records/storage/dascloud/das/v2/(?:TH-[0-9A-Za-z-]{1,60}|3:1:[A-Z0-9-]{1,60})/(?:permission|thumb_p200\.jpg)\Z"),
+    re.compile(r"/service/records/storage/deepzoomcloud/dz/v1/(?:TH-[0-9A-Za-z-]{1,60}|3:1:[A-Z0-9-]{1,60})/image\.xml\Z"),
+    re.compile(r"/service/records/storage/deepzoomcloud/dz/v1/(?:TH-[0-9A-Za-z-]{1,60}|3:1:[A-Z0-9-]{1,60})/image_files/[0-9]{1,2}/[0-9]{1,3}_[0-9]{1,3}\.jpg\Z"),
+    re.compile(r"/service/cds/recapi/collections/[0-9]{1,12}/waypoints\Z"),
+    re.compile(r"/service/cds/recapi/waypoints/[A-Z0-9-]{1,20}:[0-9,]{1,200}\?cc=[0-9]{1,12}\Z"),
 ]
 _ALLOWED_POST = {"/search/filmdatainfo/film-data", "/search/filmdatainfo/image-data"}
 
@@ -540,6 +545,238 @@ def image(*, out, film_dgs=None, number=None, ark=None, das=None, crop=None, max
     return _guard(run)
 
 
+# ------------------------------------------------------------------------------------------------ browsing a film
+def _film_data(dgs):
+    row, = fetch([{"method": "POST", "path": "/search/filmdatainfo/film-data", "accept": "application/json", "body": _film_body(str(dgs))}])
+    data = _json(row)
+    arks = [m.group(0) for u in data.get("images") or [] for m in [re.search(r"3:1:[A-Z0-9-]+", str(u))] if m]
+    return data, arks
+
+
+def _sections(data):
+    """The film's contents text split into sections: [{label, years}]. Image ranges are not published for most films."""
+    cat = ((data.get("catalogs") or [{}])[0]).get("data") or {}
+    dgs = str(data.get("dgsNum"))
+    notes = [n for n in cat.get("film_note") or [] if isinstance(n, dict)]
+    mine = next((n for n in notes if str(n.get("digital_film_no")) == dgs), notes[0] if len(notes) == 1 else None)
+    out = []
+    for part in str((mine or {}).get("text") or "").split(" -- "):
+        m = re.search(r"(\d{4})(?:\s*-\s*(\d{4}))?", part)
+        out.append({"label": part.strip(), "years": [int(m.group(1)), int(m.group(2) or m.group(1))] if m else None})
+    return out
+
+
+_MONTHS = {"jan": 1, "feb": 2, "mar": 3, "mär": 3, "apr": 4, "mai": 5, "may": 5, "jun": 6, "jul": 7, "aug": 8, "sep": 9, "okt": 10, "oct": 10,
+           "nov": 11, "dez": 12, "dec": 12}
+_TYPES = {"baptisms": {"Baptism", "Christening", "Birth"}, "births": {"Baptism", "Christening", "Birth"}, "marriages": {"Marriage"},
+          "burials": {"Burial", "Death"}, "deaths": {"Burial", "Death"}}
+
+
+def _date_key(text):
+    """(year, month, day) from a date as written ('10. September 1843', '1 Nov 1846', '1846'); missing parts are 0."""
+    if not text:
+        return None
+    y = re.search(r"\b(1[0-9]{3}|20[0-9]{2})\b", str(text))
+    if not y:
+        return None
+    month = next((n for w in re.findall(r"[A-Za-zÄäÖöÜü]{3,}", str(text)) for k, n in _MONTHS.items() if w.lower().startswith(k)), 0)
+    day = re.search(r"\b(\d{1,2})\b\.?", re.sub(r"\b(1[0-9]{3}|20[0-9]{2})\b", "", str(text)))
+    return (int(y.group(1)), month, int(day.group(1)) if day and month else 0)
+
+
+def _flat(key):
+    return key[0] * 372 + key[1] * 31 + key[2]
+
+
+def _target(date, years):
+    """(low, high) flat keys of the wanted date or range."""
+    if date:
+        parts = [int(x) for x in date.split("-")]
+        y, m, d = (parts + [0, 0])[:3]
+        lo, hi = _flat((y, m, d)), _flat((y, m or 12, d or 31))
+        return (lo, hi) if m == 0 or d == 0 else (lo, lo)
+    a, _, b = years.partition("-")
+    return _flat((int(a), 0, 0)), _flat((int(b or a), 12, 31))
+
+
+def _probe(arks, number):
+    """The indexed records on one image: what each says (type, date, names). One image-data request, paced under the lock."""
+    body = {"type": "image-data", "args": {"imageURL": f"https://sg30p0.familysearch.org/service/records/storage/deepzoomcloud/dz/v1/{arks[number - 1]}/image.xml",
+                                          "locale": "en", "state": {"imageOrFilmUrl": "", "selectedImageIndex": -1, "viewMode": "i"}}}
+    row, = fetch([{"method": "POST", "path": "/search/filmdatainfo/image-data", "accept": "application/json", "body": body}])
+    records = _json(row).get("records") or []
+    events, names = [], []
+    for rec in records:
+        for p in rec.get("persons", []):
+            nm = next((n["nameForms"][0].get("fullText") for n in p.get("names", []) if n.get("nameForms")), None)
+            if nm:
+                names.append(nm)
+            for f in p.get("facts", []):
+                kind = str(f.get("type", "")).rsplit("/", 1)[-1]
+                key = _date_key((f.get("date") or {}).get("original"))
+                if key and (p.get("principal") or not any(q.get("principal") for q in rec.get("persons", []))):
+                    events.append({"type": kind, "date": (f.get("date") or {}).get("original"), "key": key, "name": nm})
+    return {"image": number, "records": len(records), "events": events, "names": names}
+
+
+def locate(*, film_dgs, type_=None, date=None, years=None, name=None, probes=16):
+    """Which images of a film to look at for a date (and record type, and name), by sampling the indexed records on its images."""
+    if not _DGS.match(str(film_dgs)):
+        return failure("invalid-request", problems=[{"field": "film", "issue": "invalid", "expected": "digits"}])
+    if bool(date) == bool(years) and not name:
+        return failure("invalid-request", problems=[{"field": "date", "issue": "invalid", "expected": "exactly one of --date or --years (or --name)"}])
+    if type_ and type_ not in _TYPES:
+        return failure("invalid-request", problems=[{"field": "type", "issue": "unknown-value", "valid_values": sorted(_TYPES)}])
+    try:
+        want = _target(date, years) if (date or years) else None
+    except ValueError:
+        return failure("invalid-request", problems=[{"field": "date", "issue": "invalid", "expected": "YYYY[-MM[-DD]] or --years A-B"}])
+    tokens = [t.lower() for t in (name or "").split() if t]
+
+    def run():
+        data, arks = _film_data(film_dgs)
+        total = len(arks)
+        if not total:
+            raise LaneError("familysearch-not-found", status=404)
+        sections = _sections(data)
+        seen, anchors, exact = {}, [], None
+        budget = max(1, min(int(probes), 40))
+
+        def take(number):
+            nonlocal exact
+            if number in seen or not 1 <= number <= total:
+                return None
+            seen[number] = res = _probe(arks, number)
+            kinds = _TYPES.get(type_) if type_ else None
+            keys = [e["key"] for e in res["events"] if not kinds or e["type"] in kinds]
+            full = [k for k in keys if k[1]]
+            keys = full or keys                        # a year-only date (a family's baptism year) says little: prefer exact days
+            anchors.append({"image": number, "records": res["records"], "lo": min(map(_flat, keys)) if keys else None,
+                            "hi": max(map(_flat, keys)) if keys else None,
+                            "dates": sorted({e["date"] for e in res["events"] if (not kinds or e["type"] in kinds)})[:3],
+                            "types": sorted({e["type"] for e in res["events"]})})
+            if tokens:
+                for e in res["events"]:
+                    if e["name"] and all(t in e["name"].lower() for t in tokens):
+                        exact = {"image": number, "name": e["name"], "type": e["type"], "date": e["date"]}
+            return res
+
+        first = max(1, min(budget, 10))
+        for i in range(first):
+            take(round(total * (i + 0.5) / first))
+            if exact:
+                break
+        used = len(seen)
+
+        def bracket():
+            lo_img = hi_img = None
+            hit = []
+            for a in sorted((a for a in anchors if a["lo"] is not None), key=lambda a: a["image"]):
+                if want is None:
+                    continue
+                if a["hi"] < want[0]:
+                    lo_img = a["image"]
+                elif a["lo"] > want[1]:
+                    hi_img = a["image"]
+                    break
+                else:
+                    hit.append(a["image"])
+            return lo_img, hi_img, hit
+
+        while want and not exact and used < budget:
+            lo_img, hi_img, hit = bracket()
+            a, b = (lo_img or 0), (hi_img or total + 1)
+            if b - a <= 2:
+                break
+            order = sorted((n for n in range(a + 1, b) if n not in seen), key=lambda n: abs(n - (a + b) / 2))
+            if not order:
+                break
+            take(order[0])
+            used = len(seen)
+        lo_img, hi_img, hit = bracket() if want else (None, None, [])
+        if tokens and not exact and want and (lo_img or hi_img):      # a name was asked for: look at the pages in the range
+            first_n, last_n = (lo_img or 1), (hi_img or total)
+            for n in range(first_n, last_n + 1):
+                if exact or len(seen) >= budget:
+                    break
+                take(n)
+        cands = []
+        if exact:
+            cands.append({"from": exact["image"], "to": exact["image"], "derived": "name", "match": exact})
+        elif want:
+            cands.append({"from": (lo_img or 1), "to": (hi_img or total), "derived": "anchors-bracket" if lo_img and hi_img else "anchors-open-ended",
+                          "between": [lo_img, hi_img], "pages_dated_in_range": hit})
+        lo_c, hi_c = (cands[0]["from"], cands[0]["to"]) if cands else (1, total)
+        step = max(1, (hi_c - lo_c) // 24)
+        return {"ok": True, "classification": "familysearch-locate", "dispatch_attempted": True, "state": "unchanged", "dgs": str(film_dgs),
+                "images": total, "sections": sections, "probes": len(seen), "candidates": cands,
+                "anchors": [{k: v for k, v in a.items() if k not in ("lo", "hi")} for a in sorted(anchors, key=lambda a: a["image"])],
+                "sheet_command": f"familysearch film {film_dgs} --sheet --from {lo_c} --to {hi_c} --step {step} --out sheet.jpg",
+                "note": "Anchors come from indexed records on sampled images; a film with no index gives no anchors, and then only the sheet helps."}
+    return _guard(run)
+
+
+def film_sheet(dgs, *, start, end, step, out):
+    """A contact sheet of low-resolution thumbnails with their image numbers, to find a page by eye."""
+    from PIL import Image, ImageDraw, ImageFont
+    dest = Path(out)
+    if dest.exists() or not dest.parent.is_dir() or not _DGS.match(str(dgs)) or step < 1 or start < 1 or end < start:
+        return failure("invalid-request", problems=[{"field": "sheet", "issue": "invalid", "expected": "a new file, --from <= --to, --step >= 1"}])
+    numbers = list(range(start, end + 1, step))[:48]
+
+    def run():
+        _, arks = _film_data(dgs)
+        numbers_ok = [n for n in numbers if n <= len(arks)]
+        calls = [{"method": "GET", "path": f"/service/records/storage/dascloud/das/v2/{arks[n - 1]}/thumb_p200.jpg", "accept": "image/jpeg", "binary": True}
+                 for n in numbers_ok]
+        rows = []
+        for i in range(0, len(calls), 12):
+            rows += fetch(calls[i:i + 12], pause=TILE_PACE)
+        thumbs = [Image.open(io.BytesIO(base64.b64decode(r["b64"]))).convert("RGB") for r in rows]
+        cell_w, cell_h = 200, 260
+        cols = 6
+        sheet = Image.new("RGB", (cols * cell_w, math.ceil(len(thumbs) / cols) * cell_h), "white")
+        draw, font = ImageDraw.Draw(sheet), ImageFont.load_default(size=22)
+        for i, (n, t) in enumerate(zip(numbers_ok, thumbs)):
+            t.thumbnail((cell_w - 6, cell_h - 36))
+            x, y = (i % cols) * cell_w, (i // cols) * cell_h
+            sheet.paste(t, (x + 3, y + 30))
+            draw.text((x + 6, y + 2), str(n), fill="black", font=font)
+        sheet.save(dest, format="PNG" if dest.suffix.lower() == ".png" else "JPEG", quality=88)
+        dest.chmod(0o600)
+        return {"ok": True, "classification": "familysearch-sheet", "dispatch_attempted": True, "state": "unchanged", "file": str(dest),
+                "dgs": str(dgs), "images": numbers_ok, "columns": cols}
+    return _guard(run)
+
+
+def waypoints(*, collection, waypoint=None, query=None, limit=60):
+    """Browse a browsable collection's hierarchy (state, county, district...). Leaves list their image ARKs."""
+    if not re.fullmatch(r"[0-9]{1,12}", str(collection)) or waypoint and not re.fullmatch(r"[A-Z0-9-]{1,20}:[0-9,]{1,200}", waypoint):
+        return failure("invalid-request")
+    path = (f"/service/cds/recapi/waypoints/{waypoint}?cc={collection}" if waypoint else f"/service/cds/recapi/collections/{collection}/waypoints")
+
+    def run():
+        row, = fetch([{"method": "GET", "path": path, "accept": "application/json"}])
+        sds = _json(row).get("sourceDescriptions", [])
+        words = (query or "").lower().split()
+        kids, leaves = [], []
+        for sd in sds:
+            title = (sd.get("titles") or [{}])[0].get("value")
+            about = str(sd.get("about", ""))
+            if sd.get("titleLabel"):
+                m = re.search(r"/waypoints/([A-Z0-9-]+:[0-9,]+)\?cc=", about)
+                if m and all(w in str(title).lower() for w in words):
+                    kids.append({"level": sd["titleLabel"].get("value"), "title": title, "waypoint": m.group(1)})
+            elif str(sd.get("resourceType", "")).endswith("DigitalArtifact"):
+                a = re.search(r"3:1:[A-Z0-9-]+", about)
+                if a:
+                    leaves.append(a.group(0))
+        return {"ok": True, "classification": "familysearch-waypoints", "dispatch_attempted": True, "state": "unchanged", "collection": str(collection),
+                "waypoint": waypoint, "children": kids[:int(limit)], "child_count": len(kids), "images": leaves[:int(limit)], "image_count": len(leaves),
+                "next": "familysearch waypoints --collection C --waypoint ID  (images are 3:1: ARKs for `familysearch image --ark`)"}
+    return _guard(run)
+
+
 # ------------------------------------------------------------------------------------------------ doctor and CLI
 def doctor():
     out = {"ok": False, "classification": "doctor", "port": port(), "lock_file": str(lock_file()), "checks": {}}
@@ -581,6 +818,23 @@ def build_parser():
     t.add_argument("--sources", action="store_true", help="also list the sources attached to the person")
     f = subs.add_parser("film", help="catalog entry and image count of a digital film (DGS number)")
     f.add_argument("dgs")
+    f.add_argument("--sheet", action="store_true", help="make a contact sheet of thumbnails labelled with image numbers")
+    f.add_argument("--from", dest="start", type=int, default=1)
+    f.add_argument("--to", dest="end", type=int)
+    f.add_argument("--step", type=int, default=1)
+    f.add_argument("--out", help="new file for --sheet")
+    lo = subs.add_parser("locate", help="which images of a film to look at for a date, type and name (samples the film's indexed records)")
+    lo.add_argument("--film", dest="film_dgs", required=True)
+    lo.add_argument("--type", dest="type_", choices=sorted(_TYPES))
+    lo.add_argument("--date", help="YYYY[-MM[-DD]]")
+    lo.add_argument("--years", help="A-B")
+    lo.add_argument("--name", help="words that must all appear in a name on the page")
+    lo.add_argument("--probes", type=int, default=16, help="most images to inspect (about 3 s each)")
+    w = subs.add_parser("waypoints", help="browse a browsable collection's hierarchy (state, county, district) down to image ARKs")
+    w.add_argument("--collection", required=True)
+    w.add_argument("--waypoint", help="a waypoint id from the previous call, like 9B7J-YWL:1031034401,1031034402")
+    w.add_argument("--query", help="words that must appear in a child's title")
+    w.add_argument("--limit", type=int, default=60)
     c = subs.add_parser("catalog", help="catalog by place: record types, then titles, then films with DGS numbers")
     c.add_argument("--place", required=True, help="place name as the catalog writes it, e.g. 'Germany, Bayern, Rockenhausen'")
     c.add_argument("--subject-id", help="a subject id from the first call (a record type such as Church records)")
@@ -619,7 +873,17 @@ def main(argv=None):
     elif command == "person":
         result = person(args["pid"], sources=args["sources"])
     elif command == "film":
-        result = film(args["dgs"])
+        if args["sheet"]:
+            if not (args["out"] and args["end"]):
+                result = failure("invalid-request", problems=[{"field": "sheet", "issue": "missing", "expected": "--to and --out"}])
+            else:
+                result = film_sheet(args["dgs"], start=args["start"], end=args["end"], step=args["step"], out=args["out"])
+        else:
+            result = film(args["dgs"])
+    elif command == "locate":
+        result = locate(film_dgs=args["film_dgs"], type_=args["type_"], date=args["date"], years=args["years"], name=args["name"], probes=args["probes"])
+    elif command == "waypoints":
+        result = waypoints(collection=args["collection"], waypoint=args["waypoint"], query=args["query"], limit=args["limit"])
     elif command == "catalog":
         result = catalog(place=args["place"], subject_id=args["subject_id"], years=args["years"], limit=args["limit"], films=args["films"],
                          exact=args["exact"])
