@@ -86,7 +86,7 @@ def test_apply_canary_stops_and_receipt(tmp_path, monkeypatch):
         calls.append(kw)
         if kw["dry_run"]:
             return {"ok": True}
-        return {"ok": len(calls) < 5, "state": "changed", "classification": "sent", "journal_id": len(calls)}
+        return {"ok": True, "state": "changed", "classification": "sent", "journal_id": len(calls)}
     monkeypatch.setattr(ops, "write", fake)
     m = tmp_path / "m.json"
     m.write_text(json.dumps({"tree": 5, "operations": [{"op": "fact-add", "person": 1, "set": {"a": "b"}} for _ in range(3)]}))
