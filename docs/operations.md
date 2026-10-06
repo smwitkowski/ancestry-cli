@@ -19,6 +19,7 @@ Risk classes:
 | [`fact-edit`](#fact-edit) | edit | `--assertion` | Change a fact. Only the fields you give change; the rest keep their current values. |
 | [`fact-remove`](#fact-remove) | destructive | `--assertion` | Delete a fact. |
 | [`relative-add`](#relative-add) | structural | `relation`, `status` | Create a new person and link them to this person as a relative. |
+| [`relative-link`](#relative-link) | structural | `relation`, `existing_person_id` | Link a person who is already in the tree as a relative of this person. |
 | [`person-remove`](#person-remove) | destructive | - | Permanently delete a person from the tree. |
 | [`source-create`](#source-create) | additive | `title` | Create a custom source in the tree. |
 | [`source-edit`](#source-edit) | edit | `source_id` | Change a source's fields. Fields you do not give keep their current values. |
@@ -91,10 +92,24 @@ Create a new person and link them to this person as a relative.
 - **Required:** `relation`, `status`
 - **Optional:** `given`, `surname`, `suffix`, `gender`
 - **Undo:** journal undo removes the new person
-- **Notes:** relation: Father, Mother, Spouse (verified), Son, Daughter, Brother, Sister (same route, unverified). status is Living or Deceased and has no default: a wrong guess could expose a living person. Always creates a NEW person; linking an existing person is not supported yet.
+- **Notes:** relation: Father, Mother, Spouse (verified), Son, Daughter, Brother, Sister (same route, unverified). status is Living or Deceased and has no default: a wrong guess could expose a living person. Always creates a NEW person; use relative-link for someone already in the tree.
 
 ```bash
 ancestry write relative-add --tree TREE --person PERSON --set relation=Father --set given=John --set surname=Doe --set gender=Male --set status=Deceased --confirm-tree TREE --live
+```
+
+## relative-link
+
+Link a person who is already in the tree as a relative of this person.
+
+- **Risk:** structural
+- **Required:** `relation`, `existing_person_id`
+- **Optional:** `name`
+- **Undo:** not undoable: no relationship-only removal route is known; remove the relationship in the Ancestry UI
+- **Notes:** Find the person first with `find --complete`. The relationship is the same kind the UI's "From your tree" option creates. Check the result with `ancestry person`: the response body does not confirm the link.
+
+```bash
+ancestry write relative-link --tree TREE --person PERSON --set relation=Father --set existing_person_id=100000000001 --confirm-tree TREE --live
 ```
 
 ## person-remove

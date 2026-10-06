@@ -147,7 +147,7 @@ def _fact_remove(c, f):
            example="--set relation=Father --set given=John --set surname=Doe --set gender=Male --set status=Deceased",
            notes="relation: Father, Mother, Spouse (verified), Son, Daughter, Brother, Sister (same route, unverified). "
                  "status is Living or Deceased and has no default: a wrong guess could expose a living person. "
-                 "Always creates a NEW person; linking an existing person is not supported yet.",
+                 "Always creates a NEW person; use relative-link for someone already in the tree.",
            success=lambda d: isinstance(d, dict) and bool(d.get("newPid")))
 def _relative_add(c, f):
     _need(f.get("relation") in _RELATIONS and f.get("name_id") and f.get("gender_id") and f.get("status") in ("Living", "Deceased"))
@@ -161,6 +161,24 @@ def _relative_add(c, f):
                                  "sufname": f.get("suffix", ""), "genderRadio": f.get("gender", ""), "statusRadio": f["status"],
                                  "bdate": "", "bplace": "", "ddate": "", "dplace": "", "isAlternateParent": False,
                                  "nameId": str(f["name_id"]), "genderId": str(f["gender_id"])}})
+
+
+@operation("relative-link", summary="Link a person who is already in the tree as a relative of this person.", risk=STRUCTURAL,
+           required=("relation", "existing_person_id"), optional=("name",), choices={"relation": _RELATIONS},
+           undo="not undoable: no relationship-only removal route is known; remove the relationship in the Ancestry UI",
+           example="--set relation=Father --set existing_person_id=100000000001",
+           notes="Find the person first with `find --complete`. The relationship is the same kind the UI's \"From your tree\" option "
+                 "creates. Check the result with `ancestry person`: the response body does not confirm the link.",
+           success=lambda d: isinstance(d, dict) and not d.get("ErrorCode"))
+def _relative_link(c, f):
+    _need(f.get("relation") in _RELATIONS and _ID.match(str(f.get("existing_person_id", ""))), "existing_person_id")
+    _need(str(f["existing_person_id"]) != str(c.person_id), "existing_person_id", "invalid")
+    return dict(method="POST", path=f"{_PREFIX}/addedit/user/{c.actor}/{c.person}/addperson",
+                body={"person": {"personId": str(c.person_id), "treeId": str(c.tree_id), "userId": c.actor},
+                      "type": f["relation"],
+                      "values": {"apmFindExistingPerson": {"name": f.get("name", ""), "birth": "", "death": "",
+                                                           "PID": int(f["existing_person_id"]), "genderIconType": ""},
+                                 "attachedChildren": []}})
 
 
 @operation("person-remove", summary="Permanently delete a person from the tree.", risk=DESTRUCTIVE, optional=("name",),

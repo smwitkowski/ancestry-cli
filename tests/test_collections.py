@@ -118,3 +118,12 @@ def test_find_complete_pages_and_redacts(monkeypatch):
     out = discovery.find_complete(tree_id=5, surname="B", limit=100)
     assert out["total"] == 51 and out["complete"] is True
     assert out["results"][-1]["name"] != "D" and out["results"][-1]["possibly_living"] is True
+
+
+def test_relative_link_body_and_no_self_link():
+    import pytest
+    from ancestry_cli import ops
+    r = ops.build("relative-link", tree_id=5, person_id=7, relation="Father", existing_person_id="9", actor="g")
+    assert r["body"]["values"]["apmFindExistingPerson"]["PID"] == 9 and r["body"]["type"] == "Father"
+    with pytest.raises(ops.WriteRequestError):
+        ops.build("relative-link", tree_id=5, person_id=7, relation="Father", existing_person_id="7", actor="g")

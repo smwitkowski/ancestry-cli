@@ -343,7 +343,7 @@ def _finish(w, resp, extra, fields, req_hash, streams):
                        response_shape=response_shape, ids=ids, details=details, **progress, **({"warnings": warnings} if warnings else {}))
     out = {"ok": True, "classification": "sent", "dispatch_attempted": True, "state": "changed", "status": status,
            "response_shape": response_shape, "ids": ids, "journal_id": journal_id}
-    if ids.get("newPid"):
+    if ids.get("newPid") and w.op == "relative-add":        # relative-link echoes the anchor id in newPid
         out["new_person_id"] = ids["newPid"]
     if w.snapshot_path:
         out["snapshot"] = w.snapshot_path.rsplit("/", 1)[-1]
