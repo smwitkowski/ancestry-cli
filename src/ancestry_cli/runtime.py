@@ -260,12 +260,13 @@ def breaker_until():
 class Lease:
     bridge: object
     target_id: str = ""
+    origin: str = ORIGIN            # the site this lease drives; tabs on other sites are ignored
 
     @property
     def base(self):
         return f"http://127.0.0.1:{config.port()}"
 
-    def pages(self):
+    def _all(self):
         try:
             targets = self.bridge._cdp_json(self.base, "/json/list")
         except (Exception, SystemExit):
@@ -273,23 +274,33 @@ class Lease:
         pages = [t for t in targets if isinstance(t, dict) and t.get("type") == "page"] if isinstance(targets, list) else []
         if not pages:
             raise LaneError("browser-lane-not-running")
-        if len(pages) != 1:
+        return pages
+
+    def pages(self):
+        """The one page on this lease's site. Pages on other sites (another tool's tab) do not count."""
+        pages = self._all()
+        mine = [t for t in pages if _origin(t.get("url", "")) == self.origin]
+        if len(mine) > 1:
             raise LaneError("browser-lane-ambiguous")
-        return pages[0]
+        if not mine:
+            raise LaneError("browser-lane-site-required")
+        return mine[0]
 
     def check(self):
-        """Exactly one page, on www.ancestry.com. Never opens, navigates or closes anything."""
+        """Exactly one page on the site (others on different sites are left alone). Never opens, navigates or closes anything."""
         page = self.pages()
         tid = page.get("id")
         if not isinstance(tid, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", tid):
             raise LaneError("browser-lane-target-invalid")
         if self.target_id and tid != self.target_id:
             raise LaneError("browser-lane-target-changed")
-        parsed = urlsplit(page.get("url", ""))
-        if f"{parsed.scheme}://{parsed.netloc}" != ORIGIN:
-            raise LaneError("browser-lane-site-required")
         self.target_id = tid
         return self
+
+
+def _origin(url):
+    parsed = urlsplit(url)
+    return f"{parsed.scheme}://{parsed.netloc}"
 
 
 def open_lane(bridge):
@@ -302,7 +313,8 @@ def lane_reset(bridge=None):
     bridge = bridge or load_bridge()
     with lock():
         lease = Lease(bridge)
-        page = lease.pages()                                  # raises not-running / ambiguous
+        every = lease._all()
+        page = every[0] if len(every) == 1 else lease.pages()   # one tab anywhere, or the single ancestry.com tab
         version = bridge._cdp_json(lease.base, "/json/version")
         ws = version.get("webSocketDebuggerUrl")
         if not ws:

@@ -271,10 +271,24 @@ def test_cli_profile_flag_selects_the_profile(tmp_path, monkeypatch, capsys):
 def test_lane_reset_needs_exactly_one_page(lane, monkeypatch):
     class B:
         def _cdp_json(self, base, path):
-            return [{"type": "page", "id": "a", "url": "x"}, {"type": "page", "id": "b", "url": "y"}]
+            return [{"type": "page", "id": "a", "url": "https://www.ancestry.com/x"}, {"type": "page", "id": "b", "url": "https://www.ancestry.com/y"}]
     with pytest.raises(rt.LaneError) as e:
         rt.lane_reset(B())
     assert e.value.code == "browser-lane-ambiguous"
+
+
+def test_tabs_on_other_sites_do_not_count_against_the_lane():
+    def bridge(*pages):
+        class B:
+            def _cdp_json(self, base, path):
+                return [{"type": "page", "id": i, "url": u} for i, u in pages]
+        return B()
+    both = bridge(("a", "https://www.ancestry.com/x"), ("n", "https://www.newspapers.com/y"))
+    assert rt.Lease(both).check().target_id == "a"
+    assert rt.Lease(both, origin="https://www.newspapers.com").check().target_id == "n"
+    with pytest.raises(rt.LaneError) as e:
+        rt.Lease(bridge(("n", "https://www.newspapers.com/y"))).check()
+    assert e.value.code == "browser-lane-site-required"
 
 
 def test_lock_file_override_shares_a_workspace_lock(monkeypatch, tmp_path):
