@@ -127,3 +127,12 @@ def test_relative_link_body_and_no_self_link():
     assert r["body"]["values"]["apmFindExistingPerson"]["PID"] == 9 and r["body"]["type"] == "Father"
     with pytest.raises(ops.WriteRequestError):
         ops.build("relative-link", tree_id=5, person_id=7, relation="Father", existing_person_id="7", actor="g")
+
+
+def test_match_tags():
+    from ancestry_cli.match import tag
+    assert tag({"exact": 0, "similar": 0, "different": 0}) == "attached"
+    assert tag({"exact": 3, "similar": 1, "different": 0}) == "likely_match"
+    assert tag({"exact": 1, "similar": 0, "different": 3}) == "conflict"
+    assert tag({"exact": 0, "similar": 2, "different": 0}) == "namesake"
+    assert tag({"exact": 2, "similar": 3, "different": 1}) == "maybe"

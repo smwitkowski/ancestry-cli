@@ -43,6 +43,12 @@ A living person is returned redacted unless `--include-living`.
 ### `ancestry read search --given G --surname S [--birth Y] [--death Y] [--location L] [--collection N] [--counts] [--full]`
 Record search. `--counts` returns hit counts per category; `--collection N` searches inside one collection. By default only
 the response's shape is returned; `--full` returns the data (`results.items[*].collectionId/recordId/imageIds`).
+### `ancestry match --surname S [--given G] [--birth Y] [--death Y] [--location L] [--collection C] [--limit N]`
+Searches records, then asks Ancestry's match explainer how well each of the first N hits (default 5, max 20) agrees with your terms.
+Each candidate has `match_counts` (exact / similar / different), a `tag` (likely_match, maybe, conflict, namesake, attached, weak;
+a heuristic on the counts, not proof), and up to three explanations. `attached` means all counts are zero, which the explainer
+returns for records Ancestry already links to the person. Read the record before using it.
+
 ### `ancestry sources --tree T [--person P] [--query WORDS]`
 Lists the tree's custom sources (id, title, author, publisher, call number, repository id), optionally only titles containing every
 word. Run it before `write source-create` so a source is reused, not duplicated. `--person` is optional once the account is pinned.

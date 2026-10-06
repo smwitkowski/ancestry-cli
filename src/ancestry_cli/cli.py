@@ -132,6 +132,12 @@ def build_parser():
     for option in ("given", "surname", "birth", "death", "location", "keyword", "category", "query"):
         p.add_argument("--" + option)
 
+    p = subs.add_parser("match", help="score search hits against a person's facts (exact / similar / different)", allow_abbrev=False)
+    for option in ("given", "surname", "birth", "death", "location"):
+        p.add_argument("--" + option)
+    p.add_argument("--collection", type=int)
+    p.add_argument("--limit", type=int, default=5, help="how many hits to score (max 20)")
+
     p = subs.add_parser("sources", help="list or find the tree's custom sources by title (reuse before creating)", allow_abbrev=False)
     _tree_arg(p)
     p.add_argument("--person", dest="person_id", type=int, help="optional if the account is pinned (`whoami --pin`)")
@@ -228,6 +234,9 @@ def _run(command, args):
     if command == "init":
         from .setup import init
         return init()
+    if command == "match":
+        from .match import match
+        return match(**args)
     if command == "apply":
         from .apply import apply as apply_manifest
         return apply_manifest(manifest=args["manifest"], live=args["live"])

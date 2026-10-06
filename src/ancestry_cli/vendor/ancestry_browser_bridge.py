@@ -337,6 +337,17 @@ class ChromeBrowserSession:
             allow_redirects=False,
         )
 
+    def post_read(self, url: str, *, json: Any, timeout: float | None = None) -> BrowserResponse:
+        """The record match explainer: a POST that only reads (it scores one record against a search). Nothing else may use it."""
+        parsed = urllib.parse.urlsplit(url)
+        if parsed.scheme != "https" or parsed.netloc != "www.ancestry.com" or not re.fullmatch(
+                r"/api/search-results/record/[0-9]{1,9}/[0-9]{1,15}/", parsed.path):
+            raise BridgeError("post_read only permits the record match explainer")
+        import json as _json
+        return _run(self.cdp_url, self.target_id, "POST", url, body=_json.dumps(json),
+                    headers={"Content-Type": "application/json", "Accept": "application/json"},
+                    timeout=timeout or self.timeout, allow_redirects=False)
+
     def put_binary(self, url: str, *, data: bytes, content_type: str, params: dict[str, Any] | None = None,
                    timeout: float | None = None, **_: Any) -> BrowserResponse:
         """Side-effecting binary PUT (media upload stream) in the authenticated tab; allowlisted endpoints only."""
