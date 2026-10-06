@@ -6,3 +6,13 @@
   `collections find` over many keywords and places.
 - Collection browse by place (`browse_collection_hierarchy` already works: state, then county, then city).
 - See also the open gaps in [architecture.md](architecture.md).
+
+## From the first multi-agent setup (reviewer notes)
+- Default `write_trees` to deny (today a missing list means every owned tree is writable; `doctor` now warns).
+- Read-back and snapshots do not carry preferred flags, place ids (GPID) or name parts, so the verified diff cannot prove they were preserved.
+- Dry-run on a non-writable tree shows a partial request body; load the live form or label it partial.
+- `journal undo --live` returns no `state` or read-back; writes do.
+- The lane needs exactly one page per Chrome; bind to a tab by origin instead so other sites can share the browser.
+- Custom sources cannot be deleted (no route captured); put UI steps in each `manual_cleanup` entry.
+- `find` uses the person picker and may not be exhaustive; document it and add a complete in-tree search.
+- Add an actor label (for example `ANCESTRY_CLI_ACTOR`) to journal entries when homes are shared.

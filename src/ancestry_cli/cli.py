@@ -12,6 +12,7 @@ from . import __version__, config
 def _problems_from(message):
     """Turn an argparse message into structured problems: option names and allowed choices, never the user's values."""
     import re
+
     from .runtime import suggest
     problems = []
     if m := re.match(r"argument (\S+): invalid choice: '(.*?)' \(choose from (.*)\)$", message):
@@ -147,13 +148,23 @@ def build_parser():
 
 
 def doctor():
-    from .runtime import Lease, LaneError, load_bridge, breaker_until, get_json, session, guarded
     from .journal import manual
+    from .runtime import (
+        LaneError,
+        Lease,
+        breaker_until,
+        get_json,
+        guarded,
+        load_bridge,
+        session,
+    )
     out = {"ok": False, "classification": "doctor", "home": str(config.HOME), "profile": config.profile_name(),
-           "port": config.port(), "sandbox_trees": sorted(config.sandbox_trees()),
+           "port": config.port(), "chrome_profile": str(config.chrome_profile()), "sandbox_trees": sorted(config.sandbox_trees()),
            "write_trees": sorted(config.write_trees()) if config.write_trees() is not None else None, "checks": {}}
     checks = out["checks"]
     until = breaker_until()
+    if config.write_trees() is None:
+        checks["write_trees_warning"] = "no write_trees allowlist, so every tree you own is writable"
     checks["bot_challenge_block"] = "ok" if not until else f"blocked-until-{int(until)}"
     unknown = [r["id"] for r in manual() if r.get("outcome") == "unknown"]
     checks["unknown_outcomes"] = "ok" if not unknown else f"{len(unknown)} unresolved (journal ids {unknown[:5]})"
@@ -245,7 +256,7 @@ def _run(command, args):
     if command == "hint":
         from .hints import command as hint_command
         return hint_command(**args)
-    from .journal import command as journal_command      # command == "journal"
+    from .journal import command as journal_command  # command == "journal"
     return journal_command(**args)
 
 
@@ -262,7 +273,15 @@ def _apply_profile_flag(argv):
 
 def main(argv=None):
     from .runtime import annotate
-    args = vars(build_parser().parse_args(_apply_profile_flag(argv)))
+    argv = _apply_profile_flag(argv)
+    bad = config.unknown_profile()
+    if bad:
+        from .runtime import failure
+        result = annotate(failure("configuration-error", problems=[{"field": "profile", "issue": "unknown-value"}],
+                                  hint=f"Profile {bad!r} is not defined in config.json."))
+        print(json.dumps(result, ensure_ascii=True, allow_nan=False))
+        return 2
+    args = vars(build_parser().parse_args(argv))
     command = args.pop("command")
     args.pop("profile", None)
     result = annotate(_run(command, args))

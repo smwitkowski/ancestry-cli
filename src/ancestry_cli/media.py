@@ -1,5 +1,6 @@
 """Media upload planning and the three-request upload (HAR c50): stoken -> stream PUT -> attach POST."""
 from __future__ import annotations
+
 import hashlib
 from pathlib import Path
 
@@ -22,8 +23,9 @@ def media_details(path):
     """-> (bytes, sha256, mime, width, height, extension) for a local image."""
     p = _file(path)
     data = p.read_bytes()
-    from PIL import Image
     import io
+
+    from PIL import Image
     with Image.open(io.BytesIO(data)) as im:
         width, height = im.size
     return data, hashlib.sha256(data).hexdigest(), MIME[p.suffix.lower()], width, height, p.suffix.lower().lstrip(".")

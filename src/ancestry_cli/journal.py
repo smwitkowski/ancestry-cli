@@ -3,13 +3,13 @@
 Stores ids and the inverse operation only (no descriptions, dates or other values).
 """
 from __future__ import annotations
+
 import json
 import os
 import time
 from pathlib import Path
 
 from . import config
-
 
 
 def _rows():

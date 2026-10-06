@@ -11,7 +11,15 @@ import re
 
 from . import config
 from . import runtime as rt
-from .runtime import LaneError, actor_from_page, classify_exception, classify_preflight, failure, shape, trip_breaker
+from .runtime import (
+    LaneError,
+    actor_from_page,
+    classify_exception,
+    classify_preflight,
+    failure,
+    shape,
+    trip_breaker,
+)
 
 _BASE = "https://www.ancestry.com"
 _LIST_FIELDS = ("group", "name", "path", "query", "needs", "notes")

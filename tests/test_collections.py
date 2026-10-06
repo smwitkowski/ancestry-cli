@@ -19,3 +19,14 @@ def test_find_flattens_dedupes_sorts_and_remembers(monkeypatch, tmp_path):
 
 def test_find_needs_a_name_or_keyword():
     assert col.find()["classification"] == "missing-arguments"
+
+
+def test_unknown_profile_is_an_error_not_a_fallback(monkeypatch, tmp_path):
+    (tmp_path / "config.json").write_text('{"write_trees": [1], "profiles": {"a": {"write_trees": [2]}}}')
+    monkeypatch.setattr(config, "HOME", tmp_path)
+    monkeypatch.setenv("ANCESTRY_CLI_PROFILE", "typo")
+    assert config.unknown_profile() == "typo"
+    monkeypatch.setenv("ANCESTRY_CLI_PROFILE", "a")
+    assert config.unknown_profile() is None
+    monkeypatch.delenv("ANCESTRY_CLI_PROFILE")
+    assert config.unknown_profile() is None          # no profile named: the flat config is the default

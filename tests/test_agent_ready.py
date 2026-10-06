@@ -261,6 +261,7 @@ def test_cli_resolves_tree_aliases_and_annotates_failures(tmp_path, monkeypatch,
 
 def test_cli_profile_flag_selects_the_profile(tmp_path, monkeypatch, capsys):
     _write_config(tmp_path, monkeypatch, {"profiles": {"a": {"trees": {"t": 5}}, "b": {"trees": {"t": 6}}}})
+    monkeypatch.setenv("ANCESTRY_CLI_PROFILE", "a")   # restored at teardown, so --profile does not leak into later tests
     monkeypatch.delenv("ANCESTRY_CLI_PROFILE", raising=False)
     cli.main(["--profile", "b", "write", "fact-remove", "--tree", "t", "--person", "1", "--assertion", "5"])
     out = json.loads(capsys.readouterr().out)

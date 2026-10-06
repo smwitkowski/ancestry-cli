@@ -14,10 +14,15 @@ import re
 import time
 from dataclasses import dataclass
 
-from . import config
+from . import config, merge_payload
 from . import runtime as rt
-from . import merge_payload
-from .runtime import LaneError, classify_exception, classify_preflight, failure, trip_breaker
+from .runtime import (
+    LaneError,
+    classify_exception,
+    classify_preflight,
+    failure,
+    trip_breaker,
+)
 
 _BASE = "https://www.ancestry.com"
 _EVAL = re.compile(r"hintsui-eval/(1\.0\.0-[0-9a-z]+)/")      # the web app's deploy version; it changes, so it is read each time

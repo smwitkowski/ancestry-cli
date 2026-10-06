@@ -12,6 +12,7 @@ Profile form (several accounts/browsers; pick with --profile or ANCESTRY_CLI_PRO
 * trees: aliases usable wherever a tree id is expected.
 * account_id: pins the signed-in account; a write is refused when the page shows a different one."""
 from __future__ import annotations
+
 import json
 import os
 import tempfile
@@ -19,7 +20,7 @@ from pathlib import Path
 
 HOME = Path(os.environ.get("ANCESTRY_CLI_HOME", str(Path.home() / ".ancestry-cli")))
 _MAX_TREE_ID = 999_999_999_999
-_KEYS = ("port", "account_id", "sandbox_trees", "write_trees", "trees")
+_KEYS = ("port", "chrome_profile", "account_id", "sandbox_trees", "write_trees", "trees")
 
 
 def _raw():
@@ -33,6 +34,19 @@ def _raw():
 def profile_name():
     raw = _raw()
     return os.environ.get("ANCESTRY_CLI_PROFILE") or raw.get("default_profile") or "default"
+
+
+def unknown_profile():
+    """The requested profile's name when it is not defined in config.json (never fall back to another profile's rights)."""
+    name, profiles = profile_name(), _raw().get("profiles")
+    if name == "default" and not (isinstance(profiles, dict) and "default" in profiles):
+        return None
+    return None if isinstance(profiles, dict) and name in profiles else name
+
+
+def chrome_profile():
+    """Folder holding the dedicated Chrome's sign-in: ANCESTRY_CLI_CHROME_PROFILE, the profile's chrome_profile, or <home>/chrome-profile."""
+    return Path(os.environ.get("ANCESTRY_CLI_CHROME_PROFILE") or profile().get("chrome_profile") or HOME / "chrome-profile").expanduser()
 
 
 def profile():

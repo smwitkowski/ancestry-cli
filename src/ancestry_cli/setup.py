@@ -1,5 +1,6 @@
 """`ancestry init`: start the dedicated Chrome, wait for the owner to sign in by hand, pin the account."""
 from __future__ import annotations
+
 import json
 import shutil
 import subprocess
@@ -37,7 +38,7 @@ def init(*, wait=300):
         exe = _chrome()
         if not exe:
             return {"ok": False, "classification": "chrome-not-found", "state": "unchanged"}
-        profile = config.HOME / "chrome-profile"
+        profile = config.chrome_profile()
         profile.mkdir(parents=True, exist_ok=True)
         subprocess.Popen([exe, f"--remote-debugging-port={port}", f"--user-data-dir={profile}",
                           "--no-first-run", LOGIN], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,

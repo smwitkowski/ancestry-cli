@@ -1,5 +1,6 @@
 """Browser lane, service lock, error classification and quiet-output helpers (self-contained)."""
 from __future__ import annotations
+
 import asyncio
 import contextlib
 import fcntl

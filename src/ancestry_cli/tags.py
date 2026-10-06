@@ -1,6 +1,7 @@
 """MyTreeTags: numeric tag ids (HAR c60/c61, ids learned by toggling every tag button on a throwaway person) and
 name -> id resolution. Names match case-, space- and punctuation-insensitively; unknown names are rejected; raw ids pass."""
 from __future__ import annotations
+
 import re
 
 # UI button name (CamelCase, as in the page) -> numeric id

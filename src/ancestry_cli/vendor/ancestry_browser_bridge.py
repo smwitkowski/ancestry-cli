@@ -22,13 +22,13 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 import websockets
 
 from .api_endpoints import ENDPOINTS
-
 
 BASE = "https://www.ancestry.com"
 DEFAULT_CDP_URL = "http://127.0.0.1:9224"
@@ -40,7 +40,7 @@ SENSITIVE_NAMES = {
     "token",
     "access_token",
 }
-SENSITIVE_NAME_RE = re.compile(r"(?:^|[_-])(token|cookie|password|authorization)(?:$|[_-])", re.I)
+SENSITIVE_NAME_RE = re.compile(r"(?:^|[_-])(token|cookie|password|authorization)(?:$|[_-])", re.IGNORECASE)
 
 
 class BridgeError(RuntimeError):

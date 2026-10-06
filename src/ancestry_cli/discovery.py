@@ -1,5 +1,6 @@
 """Who am I, which trees do I have, who is this person: the commands that turn names into ids (read-only)."""
 from __future__ import annotations
+
 import datetime
 
 from . import config
@@ -101,7 +102,7 @@ def person(*, tree_id, person_id, include_living=False):
         with session() as (_b, _l, inner):
             resp = inner.get(f"https://www.ancestry.com/family-tree/person/tree/{tree_id}/person/{person_id}/facts",
                              timeout=60, allow_redirects=False, writes_ok=False)
-            from .runtime import classify_preflight, LaneError
+            from .runtime import LaneError, classify_preflight
             code = classify_preflight(getattr(resp, "status_code", None), resp.text)
             if code:
                 raise LaneError(code)

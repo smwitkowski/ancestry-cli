@@ -5,6 +5,7 @@ any op in SNAPSHOT_OPS is sent. It supplies the inverse for fact-edit and fact-r
 removed person by hand. Diffs report ids and field names only.
 """
 from __future__ import annotations
+
 import html
 import json
 import os
@@ -24,7 +25,7 @@ class SnapshotError(ValueError):
 
 
 def person_data(page_text):
-    m = re.search(r'<script[^>]*id="person-data"[^>]*>(.*?)</script>', page_text, re.S)
+    m = re.search(r'<script[^>]*id="person-data"[^>]*>(.*?)</script>', page_text, re.DOTALL)
     if not m:
         raise SnapshotError("person-data-missing")
     raw = m.group(1).strip()

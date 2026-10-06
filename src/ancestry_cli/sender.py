@@ -19,8 +19,19 @@ from urllib.parse import urlencode
 from . import config
 from . import runtime as rt
 from .ops import SPECS, WriteRequestError, build, succeeded
-from .runtime import LaneError, actor_from_page, classify_exception, classify_preflight, failure, open_lane, shape, trip_breaker
-from .snapshots import SNAPSHOT_OPS, diff as snapshot_diff, person_data, restore_fields, save as save_snapshot, snapshot_from_page
+from .runtime import (
+    LaneError,
+    actor_from_page,
+    classify_exception,
+    classify_preflight,
+    failure,
+    open_lane,
+    shape,
+    trip_breaker,
+)
+from .snapshots import SNAPSHOT_OPS, person_data, restore_fields, snapshot_from_page
+from .snapshots import diff as snapshot_diff
+from .snapshots import save as save_snapshot
 
 _BASE = "https://www.ancestry.com"
 _JOURNAL_FIELDS = ("assertion_id", "citation_id", "hint_id", "media_id", "web_link_id")   # ids only, never names or text
@@ -156,6 +167,7 @@ def _prepare(w, fields):
 def _media_send(w, fields, attach_url, headers):
     """stoken GET -> binary stream PUT -> attach POST. Returns (last response, journal extras)."""
     import uuid
+
     from .media import NAMESPACE, attach_body, media_details
     data, sha, mime, width, height, ext = media_details(fields["file"])
     media_id = str(uuid.uuid4())
@@ -266,6 +278,8 @@ def _finish(w, resp, extra, fields, req_hash, streams):
                        response_shape=response_shape, ids=ids, details=details, **progress, **({"warnings": warnings} if warnings else {}))
     out = {"ok": True, "classification": "sent", "dispatch_attempted": True, "state": "changed", "status": status,
            "response_shape": response_shape, "ids": ids, "journal_id": journal_id}
+    if ids.get("newPid"):
+        out["new_person_id"] = ids["newPid"]
     if w.snapshot_path:
         out["snapshot"] = w.snapshot_path.rsplit("/", 1)[-1]
     warnings = []
