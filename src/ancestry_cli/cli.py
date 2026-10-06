@@ -121,6 +121,12 @@ def build_parser():
     p.add_argument("--record", dest="record_id", type=int)
     p.add_argument("--counts", action="store_true")
 
+    p = subs.add_parser("collections", help="which record collections have hits (find), what one searches on (describe), what we have seen (list)", allow_abbrev=False)
+    p.add_argument("action", choices=("find", "describe", "list"))
+    p.add_argument("id", nargs="?", type=int, help="collection id, for describe")
+    for option in ("given", "surname", "birth", "death", "location", "keyword", "category", "query"):
+        p.add_argument("--" + option)
+
     p = subs.add_parser("hint", help="list a person's hints or accept one", allow_abbrev=False)
     p.add_argument("action", choices=("list", "accept"))
     _tree_arg(p, True)
@@ -198,6 +204,14 @@ def _run(command, args):
     if command == "init":
         from .setup import init
         return init()
+    if command == "collections":
+        from . import collections as col
+        from .runtime import failure
+        if args["action"] == "describe":
+            return col.describe(args["id"]) if args["id"] else failure("missing-arguments")
+        if args["action"] == "list":
+            return col.listing(query=args["query"])
+        return col.find(**{k: args[k] for k in ("given", "surname", "birth", "death", "location", "keyword", "category")})
     if command == "doctor":
         return doctor()
     if command == "whoami":

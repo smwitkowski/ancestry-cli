@@ -43,6 +43,16 @@ A living person is returned redacted unless `--include-living`.
 ### `ancestry read search --given G --surname S [--birth Y] [--death Y] [--location L] [--collection N] [--counts] [--full]`
 Record search. `--counts` returns hit counts per category; `--collection N` searches inside one collection. By default only
 the response's shape is returned; `--full` returns the data (`results.items[*].collectionId/recordId/imageIds`).
+### `ancestry collections find|describe|list`
+Record collections. Ancestry publishes no full list, so this has three parts:
+- `find [--given G] --surname S [--birth Y] [--location L] [--keyword WORD] [--category C]`: collections with hits for a person
+  and/or keyword (id, title, hits, category). Ancestry returns only the **top five per category**; narrow with `--category`
+  (for example 36, Court, Land, Wills & Financial), `--keyword deed` or `--location` to see others. Every collection seen is saved to
+  `~/.ancestry-cli/collections.json`.
+- `describe ID`: how the collection is browsed and which search fields it accepts.
+- `list [--query WORDS]`: the saved catalogue, filtered by words in the title.
+Then search inside one: `ancestry read search --surname S --collection ID`.
+
 ### `ancestry read hints --tree T --person P`, `ancestry read record --collection C --record R`
 Hints page data and a record's details. **Take record and collection ids from a live search result**, not from examples.
 ### `ancestry read list [GROUP]` / `ancestry read get NAME [--tree T --person P --path k=v --param k=v] [--full]`
