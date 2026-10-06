@@ -74,6 +74,9 @@ Record collections. Ancestry publishes no full list, so this has three parts:
 - `list [--query WORDS]`: the saved catalogue, filtered by words in the title.
 Then search inside one: `ancestry read search --surname S --collection ID`.
 
+### `ancestry find ... --complete`
+Uses the tree's own "Find in tree" search and reads every page, so an empty result means the name is not in the tree (plain `find` uses the person picker, which may miss people). Same fields and living-person redaction as `find`.
+
 ### `ancestry read hints --tree T --person P`, `ancestry read record --collection C --record R`
 Hints page data and a record's details. **Take record and collection ids from a live search result**, not from examples.
 ### `ancestry read list [GROUP]` / `ancestry read get NAME [--tree T --person P --path k=v --param k=v] [--full]`

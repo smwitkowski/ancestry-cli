@@ -97,6 +97,43 @@ def find(*, tree_id, given=None, surname=None, birth=None, death=None, limit=20,
     return guarded(run)
 
 
+def find_complete(*, tree_id, given=None, surname=None, birth=None, death=None, limit=20, include_living=False):
+    """The tree's own "Find in tree" search: complete (every page is read), so no result means the name is not in the tree."""
+    if not (given or surname):
+        return {"ok": False, "classification": "usage-error", "dispatch_attempted": False}
+    name = " ".join(x for x in (given, surname) if x)
+
+    def run():
+        rows, page = [], 1
+        with session() as (_b, _l, inner):
+            while page <= 100:
+                batch = get_json(inner, f"/api/treesui-list/trees/{tree_id}/persons",
+                                 {"name": name, "page": str(page), "limit": "50", "fields": "EVENTS,NAMES",
+                                  "isGetFullPersonObject": "true"})
+                if not isinstance(batch, list):
+                    break
+                rows += batch
+                if len(batch) < 50:
+                    break
+                page += 1
+        out = []
+        for r in rows:
+            names = r.get("Names") or [{}]
+            events = {e.get("t"): e for e in (r.get("Events") or []) if isinstance(e, dict)}
+            b = _num((events.get("Birth") or {}).get("nd") or (events.get("Birth") or {}).get("d"))
+            dth = _num((events.get("Death") or {}).get("nd") or (events.get("Death") or {}).get("d"))
+            living = bool(r.get("l")) or _possibly_living(b, dth)
+            hide = living and not include_living
+            first = names[0]
+            out.append({"tree_id": str(tree_id), "person_id": str(r["gid"]["v"]).split(":")[0],
+                        "name": _REDACTED if hide else " ".join(x for x in (first.get("g"), first.get("s")) if x) or None,
+                        "given": None if hide else first.get("g"), "surname": None if hide else first.get("s"),
+                        "birth_year": None if hide else b, "death_year": None if hide else dth, "possibly_living": living})
+        return {"ok": True, "classification": "find", "complete": True, "results": out[:limit], "total": len(out),
+                "truncated": len(out) > limit}
+    return guarded(run)
+
+
 def person(*, tree_id, person_id, include_living=False):
     def run():
         from .snapshots import person_data, snapshot_from_page

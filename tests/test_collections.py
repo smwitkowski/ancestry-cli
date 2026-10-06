@@ -105,3 +105,16 @@ def test_image_crop_box():
     assert _crop_box("10,20,30,40", 1000, 500) == (10, 20, 40, 60)
     with pytest.raises(ValueError):
         _crop_box("900,0,200,10", 1000, 500)
+
+
+def test_find_complete_pages_and_redacts(monkeypatch):
+    import contextlib
+    from ancestry_cli import discovery
+    pages = {1: [{"gid": {"v": f"{i}:1:5"}, "Names": [{"g": "A", "s": "B"}], "Events": [{"t": "Birth", "nd": "1800"}]} for i in range(50)],
+             2: [{"gid": {"v": "99:1:5"}, "Names": [{"g": "C", "s": "D"}], "Events": [], "l": True}]}
+    monkeypatch.setattr(discovery, "session", lambda: contextlib.nullcontext((None, None, None)))
+    monkeypatch.setattr(discovery, "get_json", lambda inner, path, params: pages.get(int(params["page"]), []))
+    monkeypatch.setattr(discovery, "guarded", lambda fn: fn())
+    out = discovery.find_complete(tree_id=5, surname="B", limit=100)
+    assert out["total"] == 51 and out["complete"] is True
+    assert out["results"][-1]["name"] != "D" and out["results"][-1]["possibly_living"] is True

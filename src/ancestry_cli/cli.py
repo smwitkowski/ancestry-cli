@@ -87,6 +87,7 @@ def build_parser():
     p.add_argument("--birth", type=int); p.add_argument("--death", type=int)
     p.add_argument("--limit", type=int, default=20)
     p.add_argument("--include-living", action="store_true", help="do not redact people who may be living")
+    p.add_argument("--complete", action="store_true", help="use the tree's full search (every page): no result means not in the tree")
 
     p = subs.add_parser("person", help="facts, sources and family of one person", allow_abbrev=False)
     _tree_arg(p, True)
@@ -250,8 +251,8 @@ def _run(command, args):
         from .discovery import trees
         return trees()
     if command == "find":
-        from .discovery import find
-        return find(**args)
+        from .discovery import find, find_complete
+        return (find_complete if args.pop("complete") else find)(**{k: v for k, v in args.items() if k != "complete"})
     if command == "person":
         from .discovery import person
         return person(**args)

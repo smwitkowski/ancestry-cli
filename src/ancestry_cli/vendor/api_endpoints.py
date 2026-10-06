@@ -775,6 +775,21 @@ ENDPOINTS = [
         "notes": "All custom sources in the tree (the 'Select existing source' picker).",
     },
     {
+        "group": "people", "name": "tree_persons_search", "method": "GET",
+        "path": "/api/treesui-list/trees/{treeId}/persons",
+        "query": {"name": {"sample": "Neville"}, "page": {"sample": "1"}, "limit": {"sample": "10"},
+                  "fields": {"sample": "EVENTS,GENDERS,KINSHIP,NAMES,PHOTO,RELATIONS,TAGS"},
+                  "isGetFullPersonObject": {"sample": "true"}},
+        "kind": "json", "source": "ui probe 2026-10-06",
+        "notes": "The 'Find in tree' search: complete and paged (pair with tree_persons_count).",
+    },
+    {
+        "group": "people", "name": "tree_persons_count", "method": "GET",
+        "path": "/api/treesui-list/trees/{treeId}/personscount",
+        "query": {"name": {"sample": "Neville"}},
+        "kind": "json", "source": "ui probe 2026-10-06",
+    },
+    {
         "group": "people", "name": "source_get", "method": "GET",
         "path": "/family-tree/person/sourceedit/user/{userId}/tree/{treeId}/source/{sourceId}",
         "kind": "json", "source": "probe 2026-10-06",
