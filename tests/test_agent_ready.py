@@ -275,3 +275,13 @@ def test_lane_reset_needs_exactly_one_page(lane, monkeypatch):
     with pytest.raises(rt.LaneError) as e:
         rt.lane_reset(B())
     assert e.value.code == "browser-lane-ambiguous"
+
+
+def test_lock_file_override_shares_a_workspace_lock(monkeypatch, tmp_path):
+    shared = tmp_path / "locks" / "ancestry.lock"
+    monkeypatch.setenv("ANCESTRY_CLI_LOCK_FILE", str(shared))
+    monkeypatch.setattr(rt, "breaker_until", lambda: None)
+    assert config.lock_file() == shared
+    with rt.lock():
+        pass
+    assert float(shared.read_text()) > 0  # same timestamp format as the workspace service_lock

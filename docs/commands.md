@@ -106,4 +106,5 @@ Records your decision, which clears the entry from `manual_cleanup`.
                        "write_trees": [123, 456], "sandbox_trees": [456]}}}
 ```
 A flat file with the same keys at the top level is the `default` profile. Environment: `ANCESTRY_CLI_HOME`, `ANCESTRY_CLI_PORT`,
-`ANCESTRY_CLI_PROFILE`, `ANCESTRY_CLI_JOURNAL`, `ANCESTRY_CLI_SNAPSHOTS`.
+`ANCESTRY_CLI_PROFILE`, `ANCESTRY_CLI_JOURNAL`, `ANCESTRY_CLI_SNAPSHOTS`, `ANCESTRY_CLI_LOCK_FILE` (one lock file shared with other
+tools on the same account; its content is the last call's epoch seconds, so any flock-based pacer using that format interoperates).

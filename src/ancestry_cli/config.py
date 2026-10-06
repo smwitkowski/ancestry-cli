@@ -126,6 +126,12 @@ def lock_dir():
     return Path(tempfile.gettempdir()) / f"ancestry-cli-locks-{os.getuid()}"
 
 
+def lock_file():
+    """ANCESTRY_CLI_LOCK_FILE shares one lock with other tools on the same account; default is per Chrome port."""
+    override = os.environ.get("ANCESTRY_CLI_LOCK_FILE")
+    return Path(override) if override else lock_dir() / f"port-{port()}.lock"
+
+
 def tree_allowed(tree_id):
     return type(tree_id) is int and 0 < tree_id <= _MAX_TREE_ID
 

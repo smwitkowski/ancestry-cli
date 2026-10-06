@@ -324,8 +324,9 @@ def lock(service="ancestry"):
     until = breaker_until()
     if until:
         raise LaneError("bot-challenge-block")
-    config.lock_dir().mkdir(parents=True, exist_ok=True)
-    with open(config.lock_dir() / f"port-{config.port()}.lock", "a+") as handle:
+    path = config.lock_file()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a+") as handle:
         fcntl.flock(handle, fcntl.LOCK_EX)
         try:
             handle.seek(0)
