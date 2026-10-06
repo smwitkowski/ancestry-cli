@@ -19,7 +19,7 @@ If FamilySearch shows a bot check, the command stops with `familysearch-check-re
 | `familysearch record ARK` | one record: collection, citation, fields (film numbers, record number), persons with facts and roles, relationships |
 | `familysearch person PID [--sources]` | a family-tree person: facts, parents, spouses and children with PIDs, attached sources |
 | `familysearch film DGS` | catalog entry of a digital film: title, dates, place, image count, the films' contents |
-| `familysearch image (--film DGS --image N \| --ark 3:1:X \| --das TH-...) --out FILE [--crop x,y,w,h] [--max-tiles N]` | save a record image, optionally cropped |
+| `familysearch image (--record 1:1:X \| --film DGS --image N \| --ark 3:1:X \| --das TH-...) --out FILE [--crop x,y,w,h] [--max-tiles N]` | save a record image, optionally cropped |
 
 Notes:
 - `search` year filters rank results, they do not exclude the others. Check each hit's own date.
@@ -28,4 +28,6 @@ Notes:
 - Images are fetched as deep-zoom tiles and stitched. `--crop` takes full-size pixels, or fractions when all four numbers are 1 or less.
   The tool picks the deepest zoom whose tile count fits `--max-tiles` (default 36, 0.5 s apart), and reports `zoom_level`,
   `reduction` and `saved_size`; crop tighter or raise `--max-tiles` for more detail.
-- Not covered yet: place-based catalog search (what films a place has), and reading a film's records by place and date.
+- `--record 1:1:X` uses the image the record links to (`record` lists them as `image_arks`). Many index-only records (for example the
+  German baptism indexes) link no image: the command then stops with `familysearch-no-image-link` and names the record's digital film.
+- Not covered yet: walking a film's records by place and date.

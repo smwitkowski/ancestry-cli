@@ -57,3 +57,11 @@ def test_bad_identifiers_are_usage_errors_and_nothing_is_sent():
 def test_permission_lists_grant_when_anyone_is_in_them():
     assert fs._viewable("ThemisPrmAncestry:ThemisPrmAnyone:ThemisPrmFindMyPast") and fs._viewable("ThemisPrmAnyone")
     assert not fs._viewable("ThemisPrmAncestry:ThemisPrmFindMyPast")
+
+
+def test_image_arks_come_from_artifacts_and_extra_data():
+    g = {"sourceDescriptions": [{"resourceType": "http://gedcomx.org/DigitalArtifact", "about": "https://www.familysearch.org/ark:/61903/3:1:AAA-BBB-CCC"},
+                                {"resourceType": "http://gedcomx.org/Person", "about": "https://x/ark:/61903/1:1:ZZ"}],
+         "fields": [{"values": [{"labelId": "EXT_DATA", "text": '{"IMAGE_ARK":"https://familysearch.org/ark:/61903/3:1:DDD-EEE","X":"1"}'}]}]}
+    assert fs._image_arks(g) == ["3:1:AAA-BBB-CCC", "3:1:DDD-EEE"]
+    assert fs._image_arks({}) == []

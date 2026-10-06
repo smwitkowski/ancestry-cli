@@ -124,6 +124,7 @@ ERRORS = {
     "familysearch-rate-limited": Err(True, False, "FamilySearch is rate-limiting. Wait a few minutes before retrying.", [_RETRY]),
     "familysearch-not-found": Err(False, False, "FamilySearch has nothing at that identifier (or you may not see it). Check the ARK, PID, film or image number.", [_edit("Check the identifier.")]),
     "familysearch-unavailable": Err(True, False, "FamilySearch did not return the data (see status). Retry once; if it repeats run `familysearch doctor`.", [_RETRY, _run("familysearch", "doctor")]),
+    "familysearch-no-image-link": Err(False, False, "FamilySearch links no image to this record. If it names a digital_film, the original is on that film: use `familysearch film DGS` and look for the record's image number by browsing, or search the film's images with `familysearch image --film DGS --image N`.", [_edit("Use --film and --image, or --das, instead.")]),
     "familysearch-image-restricted": Err(False, False, "This image is not viewable with this account (see permission). Nothing was saved.", []),
     "invalid-request": Err(False, False, "A value is invalid; see problems for the field.", [_edit("Fix the listed fields.")]),
     "fact-not-found": Err(False, False, "That assertion id is not on this person. Use `ancestry person` to list fact ids.", [_run("ancestry", "person", "--tree", "{tree_id}", "--person", "{person_id}")]),

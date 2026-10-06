@@ -251,6 +251,25 @@ def search(*, surname, given=None, birth=None, death=None, marriage=None, place=
     return _guard(run)
 
 
+def _image_arks(g):
+    """Image ARKs (3:1:...) a record links to: its digital artifacts, and the IMAGE_ARK in its extra data."""
+    found = []
+    for sd in g.get("sourceDescriptions", []):
+        if str(sd.get("resourceType", "")).endswith("DigitalArtifact"):
+            found += re.findall(r"3:1:[A-Z0-9-]+", str(sd.get("about", "")))
+    for f in g.get("fields", []):
+        for v in f.get("values", []):
+            if v.get("labelId") == "EXT_DATA" and "IMAGE_ARK" in str(v.get("text", "")):
+                found += re.findall(r"IMAGE_ARK\W+[^\"]*?(3:1:[A-Z0-9-]+)", str(v["text"]))
+    return list(dict.fromkeys(found))
+
+
+def _record_row(short):
+    row, = fetch([{"method": "GET", "path": f"/ark:/61903/{short}?useSLS=true&useRolesOverride=false",
+                   "accept": "application/x-gedcomx-v1+json"}])
+    return _json(row)
+
+
 def record(ark):
     m = _ARK.match(str(ark))
     if not m:
@@ -258,9 +277,7 @@ def record(ark):
     short = m.group(1)
 
     def run():
-        row, = fetch([{"method": "GET", "path": f"/ark:/61903/{short}?useSLS=true&useRolesOverride=false",
-                       "accept": "application/x-gedcomx-v1+json"}])
-        g = _json(row)
+        g = _record_row(short)
         fields = {}
         for f in g.get("fields", []):
             label = str(f.get("type", "")).rsplit("/", 1)[-1]
@@ -276,7 +293,7 @@ def record(ark):
             a, b = (by_id.get(str((r.get(k) or {}).get("resource", "")).lstrip("#")) for k in ("person1", "person2"))
             rels.append({"type": str(r.get("type", "")).rsplit("/", 1)[-1], "person1": a and a["name"], "person2": b and b["name"]})
         return {"ok": True, "classification": "familysearch-record", "dispatch_attempted": True, "state": "unchanged", "ark": short,
-                "collection": _collection(sds), "citation": re.sub(r"</?i>", "", cite) if cite else None, "fields": fields,
+                "collection": _collection(sds), "citation": re.sub(r"</?i>", "", cite) if cite else None, "image_arks": _image_arks(g), "fields": fields,
                 "persons": people, "relationships": rels}
     return _guard(run)
 
@@ -370,13 +387,15 @@ def _crop_box(spec, width, height):
     return x, y, w, h
 
 
-def image(*, out, film_dgs=None, number=None, ark=None, das=None, crop=None, max_tiles=36):
+def image(*, out, film_dgs=None, number=None, ark=None, das=None, crop=None, max_tiles=36, record_ark=None):
     from PIL import Image
     dest = Path(out)
     if dest.exists() or not dest.parent.is_dir():
         return failure("invalid-request", problems=[{"field": "out", "issue": "invalid", "expected": "a new file in an existing folder"}])
-    if not (das or ark or (film_dgs and number)):
+    if not (das or ark or record_ark or (film_dgs and number)):
         return failure("missing-arguments")
+    if record_ark and not _ARK.match(record_ark):
+        return failure("invalid-request", problems=[{"field": "record", "issue": "invalid", "expected": "1:1:XXXX-XXX"}])
     if das and not _DAS.match(das) or ark and not _IMG_ARK.match(ark) or film_dgs and not _DGS.match(str(film_dgs)):
         return failure("invalid-request")
     try:
@@ -387,6 +406,14 @@ def image(*, out, film_dgs=None, number=None, ark=None, das=None, crop=None, max
 
     def run():
         image_ark = _IMG_ARK.match(ark).group(1) if ark else None
+        if record_ark and not (das or image_ark):
+            g = _record_row(_ARK.match(record_ark).group(1))
+            arks = _image_arks(g)
+            if not arks:
+                film_no = next((v.get("text") for f in g.get("fields", []) if str(f.get("type", "")).endswith("DigitalFilmNumber")
+                                for v in f.get("values", [])), None)
+                raise LaneError("familysearch-no-image-link", digital_film=film_no or "")
+            image_ark = arks[0]
         if film_dgs and number and not das and not image_ark:
             row, = fetch([{"method": "POST", "path": "/search/filmdatainfo/film-data", "accept": "application/json", "body": _film_body(str(film_dgs))}])
             images = _json(row).get("images") or []
@@ -484,6 +511,7 @@ def build_parser():
     i.add_argument("--image", dest="number", type=int, help="image number on the film, starting at 1")
     i.add_argument("--ark", help="image ARK 3:1:XXXX")
     i.add_argument("--das", help="image id TH-...")
+    i.add_argument("--record", dest="record_ark", help="a record ARK 1:1:XXXX-XXX: uses the image the record links to")
     i.add_argument("--out", required=True)
     i.add_argument("--crop", help="x,y,w,h in full-size pixels, or fractions when all are 1 or less")
     i.add_argument("--max-tiles", type=int, default=36, help="most tiles to fetch (more tiles = sharper, slower)")
@@ -512,7 +540,7 @@ def main(argv=None):
         result = film(args["dgs"])
     else:
         result = image(out=args["out"], film_dgs=args["film_dgs"], number=args["number"], ark=args["ark"], das=args["das"],
-                       crop=args["crop"], max_tiles=args["max_tiles"])
+                       crop=args["crop"], max_tiles=args["max_tiles"], record_ark=args["record_ark"])
     result = rt.annotate(result)
     print(json.dumps(result, ensure_ascii=True, allow_nan=False))
     return 0 if result.get("ok") is True else 1

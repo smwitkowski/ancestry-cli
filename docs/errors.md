@@ -76,6 +76,7 @@ Exit codes: `0` ok, `1` failed with nothing changed, `2` bad usage, `3` state un
 | `familysearch-rate-limited` | yes | no | FamilySearch is rate-limiting. Wait a few minutes before retrying. | retry: retry the same command |
 | `familysearch-not-found` | no | no | FamilySearch has nothing at that identifier (or you may not see it). Check the ARK, PID, film or image number. | edit-args: Check the identifier. |
 | `familysearch-unavailable` | yes | no | FamilySearch did not return the data (see status). Retry once; if it repeats run `familysearch doctor`. | retry: retry the same command<br>run: `familysearch doctor` |
+| `familysearch-no-image-link` | no | no | FamilySearch links no image to this record. If it names a digital_film, the original is on that film: use `familysearch film DGS` and look for the record's image number by browsing, or search the film's images with `familysearch image --film DGS --image N`. | edit-args: Use --film and --image, or --das, instead. |
 | `familysearch-image-restricted` | no | no | This image is not viewable with this account (see permission). Nothing was saved. |  |
 | `invalid-request` | no | no | A value is invalid; see problems for the field. | edit-args: Fix the listed fields. |
 | `fact-not-found` | no | no | That assertion id is not on this person. Use `ancestry person` to list fact ids. | run: `ancestry person --tree {tree_id} --person {person_id}` |
