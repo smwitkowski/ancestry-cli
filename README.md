@@ -23,21 +23,22 @@ uv tool install --force --reinstall .   # after pulling or changing the code
 
 ## One-time setup
 
-1. Start a dedicated Chrome with remote debugging and sign in to ancestry.com:
+Run one command:
 
-   ```bash
-   # macOS
-   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --remote-debugging-port=9224 \
-     --user-data-dir="$HOME/.ancestry-cli/chrome-profile" https://www.ancestry.com/
-   # Linux: google-chrome --remote-debugging-port=9224 --user-data-dir="$HOME/.ancestry-cli/chrome-profile" https://www.ancestry.com/
-   ```
+```bash
+ancestry init
+```
 
-   Use a dedicated profile folder, not your everyday Chrome profile. The debugging port gives any local program control of that browser,
-   so keep it on a machine and account you trust.
+It opens a dedicated Chrome (its own profile folder, remote debugging on port 9224) at the Ancestry sign-in page. **You sign in
+by hand**; the tool never sees or types your password. When you are signed in it pins your account and finishes. After that,
+leave that one tab open on www.ancestry.com (the tool never opens, navigates or closes tabs) and run `ancestry doctor`.
 
-2. Leave **exactly one tab** open on www.ancestry.com. The tool never opens, navigates or closes tabs.
-3. `ancestry doctor` should report ok. Then `ancestry whoami --pin` to pin your account, and (optionally) create
-   `~/.ancestry-cli/config.json` with tree aliases and a `write_trees` allowlist ([commands.md](docs/commands.md#config-file)).
+Why a browser at all? Ancestry blocks scripted logins, so the tool borrows a browser you signed in to yourself. Every request
+runs inside that tab, so your cookies never reach the tool. The debugging port gives local programs control of that Chrome, so
+use a machine and account you trust. To set it up manually instead, start Chrome with
+`--remote-debugging-port=9224 --user-data-dir="$HOME/.ancestry-cli/chrome-profile"`.
+
+Optionally create `~/.ancestry-cli/config.json` with tree aliases and a `write_trees` allowlist ([commands.md](docs/commands.md#config-file)).
 
 ## Quick start
 

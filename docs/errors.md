@@ -22,7 +22,10 @@ Exit codes: `0` ok, `1` failed with nothing changed, `2` bad usage, `3` state un
 
 | classification | retryable | needs a human | what to do | next actions |
 |---|---|---|---|---|
-| `browser-lane-not-running` | no | yes | Start Chrome with --remote-debugging-port=9224 and a dedicated --user-data-dir, sign in to ancestry.com, and leave one tab open on www.ancestry.com. | human: Start Chrome with --remote-debugging-port={port}, sign in to ancestry.com and keep one tab open on www.ancestry.com.<br>run: `ancestry doctor` *(after-human)* |
+| `chrome-not-found` | no | yes | Install Google Chrome (or Chromium), then run `ancestry init` again. | human: Install Google Chrome.<br>run: `ancestry init` *(after-human)* |
+| `chrome-not-listening` | yes | no | Chrome did not open its debug port. Close any Chrome using the same profile and run `ancestry init` again. | run: `ancestry init` |
+| `sign-in-timeout` | yes | yes | Sign in to Ancestry in the Chrome window, then run `ancestry init` again. | human: Sign in to Ancestry in the Chrome window.<br>run: `ancestry init` *(after-human)* |
+| `browser-lane-not-running` | no | yes | Run `ancestry init` (or start Chrome with --remote-debugging-port=9224 and a dedicated --user-data-dir), sign in to ancestry.com, and leave one tab open on www.ancestry.com. | human: Start Chrome with --remote-debugging-port={port}, sign in to ancestry.com and keep one tab open on www.ancestry.com.<br>run: `ancestry doctor` *(after-human)* |
 | `browser-lane-ambiguous` | no | yes | Close the extra tabs (exactly one page may be open), or run `ancestry lane reset`. | human: Close all tabs but one.<br>run: `ancestry lane reset` *(after-human)* |
 | `browser-lane-site-required` | no | no | The tab is not on www.ancestry.com. Run `ancestry lane reset`. | run: `ancestry lane reset`<br>retry: retry the same command |
 | `browser-lane-target-invalid` | no | yes | Chrome returned an unexpected tab id. Close and reopen the tab. | human: Close and reopen the ancestry.com tab.<br>run: `ancestry doctor` |

@@ -50,8 +50,11 @@ _VERIFY = [_run("ancestry", "journal", "verify", "--id", "{journal_id}"),
 _LIST_HINTS = [_run("ancestry", "hint", "list", "--tree", "{tree_id}", "--person", "{person_id}")]
 
 ERRORS = {
+    "chrome-not-found": Err(False, True, "Install Google Chrome (or Chromium), then run `ancestry init` again.", [_human("Install Google Chrome."), _run("ancestry", "init", when="after-human")]),
+    "chrome-not-listening": Err(True, False, "Chrome did not open its debug port. Close any Chrome using the same profile and run `ancestry init` again.", [_run("ancestry", "init")]),
+    "sign-in-timeout": Err(True, True, "Sign in to Ancestry in the Chrome window, then run `ancestry init` again.", [_human("Sign in to Ancestry in the Chrome window."), _run("ancestry", "init", when="after-human")]),
     # --- browser and session
-    "browser-lane-not-running": Err(False, True, "Start Chrome with --remote-debugging-port={port} and a dedicated --user-data-dir, sign in to ancestry.com, and leave one tab open on www.ancestry.com.",
+    "browser-lane-not-running": Err(False, True, "Run `ancestry init` (or start Chrome with --remote-debugging-port={port} and a dedicated --user-data-dir), sign in to ancestry.com, and leave one tab open on www.ancestry.com.",
                                     [_human("Start Chrome with --remote-debugging-port={port}, sign in to ancestry.com and keep one tab open on www.ancestry.com."), _run("ancestry", "doctor", when="after-human")]),
     "browser-lane-ambiguous": Err(False, True, "Close the extra tabs (exactly one page may be open), or run `ancestry lane reset`.",
                                   [_human("Close all tabs but one."), _run("ancestry", "lane", "reset", when="after-human")]),

@@ -506,7 +506,7 @@ def test_every_emitted_error_code_is_in_the_catalog():
         for pattern in patterns:
             emitted |= set(re.findall(pattern, path.read_text()))
     success = {"dry-run", "sent", "read", "hints", "whoami", "trees", "find", "person", "ops", "doctor", "lane-reset", "journal",
-               "verify", "resolved", "undone", "undo-dry-run", "endpoints", "accepted"}
+               "verify", "resolved", "undone", "undo-dry-run", "endpoints", "accepted", "init"}
     missing = sorted(c for c in emitted - success if c not in runtime.ERRORS)
     assert not missing, f"codes emitted but not in runtime.ERRORS: {missing}"
     assert all(e.hint for e in runtime.ERRORS.values())

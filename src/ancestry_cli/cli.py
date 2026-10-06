@@ -75,6 +75,7 @@ def build_parser():
     parser.add_argument("--profile", help="config profile (accounts/browsers); default from config or ANCESTRY_CLI_PROFILE")
     subs = parser.add_subparsers(dest="command", required=True)
 
+    subs.add_parser("init", help="first-time setup: open Chrome, you sign in, the account is pinned")
     subs.add_parser("doctor", help="check the browser lane, sign-in, account, trees and journal")
     p = subs.add_parser("whoami", help="which Ancestry account is signed in"); p.add_argument("--pin", action="store_true", help="save it as account_id")
     subs.add_parser("trees", help="your owned and shared trees")
@@ -194,6 +195,9 @@ def _ops(name=None):
 
 def _run(command, args):
     """Run one parsed command and return its result dict."""
+    if command == "init":
+        from .setup import init
+        return init()
     if command == "doctor":
         return doctor()
     if command == "whoami":
