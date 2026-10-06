@@ -144,6 +144,22 @@ def _open(w, bridge):
 
 
 # ---------------------------------------------------------------------------------------------------- step 2: prepare
+def _merge_source(w, fields):
+    """An edit is a patch: fill the fields not given from the source's current values (read from the tree's source list)."""
+    from .sources import current
+    row = current(w.inner, w.actor, w.tree_id, fields["source_id"])
+    if row is None:
+        raise _Refused("source-not-found")
+    have = {"title": row.get("title"), "author": row.get("auth"), "publisher": row.get("pub"), "publication_place": row.get("publ"),
+            "publication_date": row.get("pubd"), "call_number": row.get("cn"), "refn": row.get("refn"),
+            "note": _unwrap(row.get("note")), "repository_id": str((row.get("rgid") or {}).get("v", "")).split(":")[0]}
+    return {**{k: v for k, v in have.items() if v}, **fields}
+
+
+def _unwrap(note):
+    return re.sub(r"</?line>", "", note) if isinstance(note, str) else note
+
+
 def _check_source_title(w, fields):
     """Refuse to delete a source unless its live title matches expect_title (or this tool's journal created it)."""
     from .journal import _rows
@@ -176,6 +192,8 @@ def _prepare(w, fields):
         fields.setdefault("anchor_gender", "")
     elif w.op == "source-delete":
         _check_source_title(w, fields)
+    elif w.op == "source-edit":
+        fields = _merge_source(w, fields)
     elif w.op == "fact-edit":
         current = restore_fields(w.before, fields.get("assertion_id"))     # an edit is a patch: keep what was not given
         if current is None:
@@ -211,6 +229,27 @@ def _media_send(w, fields, attach_url, headers):
     return resp, extra
 
 
+def _then(w, step, first, headers):
+    """A create that needs a second request to save its other fields. Returns the first response when both worked, so the
+    operation's success test still applies; otherwise the failing response, with progress saying how far it got."""
+    status = getattr(first, "status_code", None)
+    try:
+        new_id = _ids(json.loads(first.text)).get("gid")
+    except Exception:
+        new_id = None
+    if not (isinstance(status, int) and 200 <= status < 300 and new_id):
+        return first
+    w.progress = {"done": ["create"], "failed_at": "details"}        # created, but the extra fields are not saved yet
+    w.lease.check()
+    second = w.inner.put(_BASE + step["path"].replace("{id}", new_id), data=json.dumps(step["body"]).encode(), headers=headers,
+                         timeout=30, writes_ok=True)
+    code = getattr(second, "status_code", None)
+    if isinstance(code, int) and 200 <= code < 300:
+        w.progress = {"done": ["create", "details"], "failed_at": None}
+        return first
+    return second
+
+
 def _dispatch(w, req, fields):
     """Send the request. Returns (response, journal extras). From here on an exception means an unknown outcome."""
     url = _BASE + req["path"]
@@ -227,9 +266,14 @@ def _dispatch(w, req, fields):
         return w.inner.delete(url, headers=headers, timeout=30, writes_ok=True), {}
     if req["method"] == "PATCH":
         return w.inner.patch(url, data=body, headers=headers, timeout=30, writes_ok=True), {}
+    if req["method"] == "PUT":
+        return w.inner.put(url, data=body, headers=headers, timeout=30, writes_ok=True), {}
     if req["method"] == "POST":
-        return w.inner.post(url, data=body, params=req.get("query"), headers=headers, timeout=30, allow_redirects=False,
-                            writes_ok=True), {}
+        resp = w.inner.post(url, data=body, params=req.get("query"), headers=headers, timeout=30, allow_redirects=False,
+                            writes_ok=True)
+        if req.get("then"):
+            return _then(w, req["then"], resp, headers), {}
+        return resp, {}
     query = "?" + urlencode(req["query"]) if req.get("query") else ""
     return w.inner.get(url + query, timeout=30, allow_redirects=False, writes_ok=True), {}
 

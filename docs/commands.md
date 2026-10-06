@@ -43,6 +43,14 @@ A living person is returned redacted unless `--include-living`.
 ### `ancestry read search --given G --surname S [--birth Y] [--death Y] [--location L] [--collection N] [--counts] [--full]`
 Record search. `--counts` returns hit counts per category; `--collection N` searches inside one collection. By default only
 the response's shape is returned; `--full` returns the data (`results.items[*].collectionId/recordId/imageIds`).
+### `ancestry sources --tree T [--person P] [--query WORDS]`
+Lists the tree's custom sources (id, title, author, publisher, call number, repository id), optionally only titles containing every
+word. Run it before `write source-create` so a source is reused, not duplicated. `--person` is optional once the account is pinned.
+Source and citation fields: `write source-create` and `source-edit` take author, publisher, publication_place, publication_date,
+call_number, refn, note and repository_id; `write repository-create` makes a repository and returns its id;
+`write source-set-repository` links one; `write citation-add` and `citation-edit` take date, other_info, transcription and url.
+`citation-edit` replaces every citation field (omitted ones are cleared); `source-edit` keeps fields you do not give.
+
 ### `ancestry collections find|describe|list`
 Record collections. Ancestry publishes no full list, so this has three parts:
 - `find [--given G] --surname S [--birth Y] [--location L] [--keyword WORD] [--category C]`: collections with hits for a person

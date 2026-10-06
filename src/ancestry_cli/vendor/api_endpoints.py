@@ -769,6 +769,12 @@ ENDPOINTS = [
         "notes": "Create a custom source. Response {gid:{v:'<sourceId>:n:n'},title,cd,md}; sourceId is the first gid segment.",
     },
     {
+        "group": "people", "name": "sources_list", "method": "GET",
+        "path": "/family-tree/person/sourceedit/user/{userId}/tree/{treeId}/sources/",
+        "kind": "json", "source": "ui probe 2026-10-06",
+        "notes": "All custom sources in the tree (the 'Select existing source' picker).",
+    },
+    {
         "group": "people", "name": "source_get", "method": "GET",
         "path": "/family-tree/person/sourceedit/user/{userId}/tree/{treeId}/source/{sourceId}",
         "kind": "json", "source": "probe 2026-10-06",
@@ -779,6 +785,34 @@ ENDPOINTS = [
         "path": "/family-tree/person/sourceedit/user/{userId}/tree/{treeId}/source/{sourceId}",
         "kind": "json", "source": "genealogy source-delete devtools HAR 2026-10-06", "side_effect": True,
         "notes": "Delete a custom source and every citation of it (UI: Edit source, Delete this source, confirm). Empty body, 200, {}.",
+    },
+    {
+        "group": "writes", "name": "source_update", "method": "PUT",
+        "path": "/family-tree/person/sourceedit/user/{userId}/tree/{treeId}/source/{sourceId}",
+        "body": {"title": "t", "auth": "", "pub": "", "publ": "", "pubd": "", "cn": "", "note": "", "refn": "", "repositoryId": ""},
+        "kind": "json", "source": "ui capture 2026-10-06", "side_effect": True,
+        "notes": "Edit a custom source (UI: Edit source, Save). Replaces all fields.",
+    },
+    {
+        "group": "writes", "name": "citation_update", "method": "PUT",
+        "path": "/family-tree/person/sourceedit/user/{userId}/tree/{treeId}/person/{personId}/citation/{citationId}",
+        "body": {"title": "t", "url": "", "d": "", "oi": "", "trans": "", "sourceId": "1"},
+        "kind": "json", "source": "ui capture 2026-10-06", "side_effect": True,
+        "notes": "Edit a citation (details, web address, date, other information, transcription).",
+    },
+    {
+        "group": "writes", "name": "repository_create", "method": "POST",
+        "path": "/family-tree/person/sourceedit/user/{userId}/tree/{treeId}/repository",
+        "body": {"name": "n", "adr": "", "ph": "", "eml": "", "cn": "", "note": "", "refn": ""},
+        "kind": "json", "source": "ui capture 2026-10-06", "side_effect": True,
+        "notes": "Create a repository.",
+    },
+    {
+        "group": "writes", "name": "source_repository_attach", "method": "PUT",
+        "path": "/family-tree/person/sourceedit/user/{userId}/tree/{treeId}/source/{sourceId}/reference",
+        "body": {"repositoryId": "1", "actionType": "attach"},
+        "kind": "json", "source": "ui capture 2026-10-06", "side_effect": True,
+        "notes": "Link a repository to a source.",
     },
     {
         "group": "writes", "name": "citation_create", "method": "POST",

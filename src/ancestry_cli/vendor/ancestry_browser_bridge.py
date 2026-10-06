@@ -379,6 +379,19 @@ class ChromeBrowserSession:
         return _run(self.cdp_url, self.target_id, "PATCH", request_url, body=body or None, headers=headers or None,
                     timeout=timeout or self.timeout, allow_redirects=False)
 
+    def put(self, url: str, *, params: dict[str, Any] | None = None, data: str | bytes | None = None,
+            timeout: float | None = None, headers: dict[str, str] | None = None, **_: Any) -> BrowserResponse:
+        """Side-effecting PUT in the authenticated tab; the endpoint must be in the write allowlist."""
+        parsed = urllib.parse.urlsplit(url)
+        if parsed.scheme != "https" or parsed.netloc != "www.ancestry.com":
+            raise BridgeError("browser bridge only permits https://www.ancestry.com requests")
+        validate_write_request("PUT", parsed.path, params, headers)
+        query = urllib.parse.urlencode({**urllib.parse.parse_qs(parsed.query, keep_blank_values=True), **(params or {})}, doseq=True)
+        request_url = urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, parsed.path, query, ""))
+        body = data.decode("utf-8") if isinstance(data, bytes) else (data or "")
+        return _run(self.cdp_url, self.target_id, "PUT", request_url, body=body or None, headers=headers or None,
+                    timeout=timeout or self.timeout, allow_redirects=False)
+
     def request(
         self,
         method: str,

@@ -128,6 +128,11 @@ def build_parser():
     for option in ("given", "surname", "birth", "death", "location", "keyword", "category", "query"):
         p.add_argument("--" + option)
 
+    p = subs.add_parser("sources", help="list or find the tree's custom sources by title (reuse before creating)", allow_abbrev=False)
+    _tree_arg(p)
+    p.add_argument("--person", dest="person_id", type=int, help="optional if the account is pinned (`whoami --pin`)")
+    p.add_argument("--query", help="words that must all appear in the title")
+
     p = subs.add_parser("hint", help="list a person's hints or accept one", allow_abbrev=False)
     p.add_argument("action", choices=("list", "accept"))
     _tree_arg(p, True)
@@ -215,6 +220,9 @@ def _run(command, args):
     if command == "init":
         from .setup import init
         return init()
+    if command == "sources":
+        from .sources import find as find_sources
+        return find_sources(tree_id=args["tree_id"], person_id=args["person_id"], query=args["query"])
     if command == "collections":
         from . import collections as col
         from .runtime import failure

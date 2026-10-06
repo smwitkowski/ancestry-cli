@@ -174,13 +174,67 @@ def _person_remove(c, f):
 
 
 # ---------------------------------------------------------------------------------------------------- sources
+_SRC = {"author": "auth", "publisher": "pub", "publication_place": "publ", "publication_date": "pubd",
+        "call_number": "cn", "refn": "refn", "note": "note"}           # field name -> the site's key
+_CIT = {"date": "d", "other_info": "oi", "transcription": "trans"}
+_REPO = {"address": "adr", "phone": "ph", "email": "eml", "call_number": "cn", "refn": "refn", "note": "note"}
+
+
+def _src_body(title, f):
+    return {"title": title, **{key: str(f.get(name) or "") for name, key in _SRC.items()},
+            "repositoryId": str(f.get("repository_id") or "")}
+
+
+def _cit_body(f):
+    return {"title": f["title"], "url": f.get("url", ""), **{key: str(f.get(name) or "") for name, key in _CIT.items()},
+            "sourceId": str(f["source_id"])}
+
+
 @operation("source-create", summary="Create a custom source in the tree.", risk=ADDITIVE, required=("title",),
-           undo="`journal undo` deletes the source with source-delete",
-           example="--set title='1900 census, Springfield IL'", notes="Returns ids.gid, the new source id (use it as source_id).",
+           optional=tuple(_SRC) + ("repository_id",), undo="`journal undo` deletes the source with source-delete",
+           example="--set title='1900 census, Springfield IL' --set author='US Census Bureau' --set publication_date=1900",
+           notes="Returns ids.gid, the new source id (use it as source_id). Any field beyond title is saved with a second request; "
+                 "progress shows how far it got. author, publisher, publication_place, publication_date, call_number, refn, note; "
+                 "repository_id links a repository from repository-create.",
            success=lambda d: isinstance(d, dict) and isinstance(d.get("gid"), dict))
 def _source_create(c, f):
     _need(f.get("title"))
-    return dict(method="POST", path=f"{_PREFIX}/sourceedit/user/{c.actor}/tree/{c.tree_id}/source", body={"title": f["title"]})
+    req = dict(method="POST", path=f"{_PREFIX}/sourceedit/user/{c.actor}/tree/{c.tree_id}/source", body={"title": f["title"]})
+    if any(f.get(k) for k in tuple(_SRC) + ("repository_id",)):
+        req["then"] = dict(method="PUT", path=f"{_PREFIX}/sourceedit/user/{c.actor}/tree/{c.tree_id}/source/{{id}}",
+                           body=_src_body(f["title"], f))
+    return req
+
+
+@operation("source-edit", summary="Change a source's fields. Fields you do not give keep their current values.", risk=EDIT,
+           required=("source_id",), optional=("title",) + tuple(_SRC) + ("repository_id",), undo="not undoable",
+           example="--set source_id=380000001 --set publisher='Government Printing Office'",
+           notes="person is only the page used for the pre-flight check. Current values are read from the source list first.",
+           success=lambda d: True)
+def _source_edit(c, f):
+    _need(_ID.match(str(f.get("source_id", ""))) and f.get("title"))
+    return dict(method="PUT", path=f"{_PREFIX}/sourceedit/user/{c.actor}/tree/{c.tree_id}/source/{f['source_id']}",
+                body=_src_body(f["title"], f))
+
+
+@operation("repository-create", summary="Create a repository (archive, library, website) in the tree.", risk=ADDITIVE,
+           required=("name",), optional=tuple(_REPO), undo="not undoable: remove it in the Ancestry UI",
+           example="--set name='Ohio History Connection' --set address='800 E 17th Ave, Columbus OH'",
+           notes="Returns ids.gid, the repository id (use it as repository_id).",
+           success=lambda d: isinstance(d, dict) and isinstance(d.get("gid"), dict))
+def _repository_create(c, f):
+    _need(f.get("name"))
+    return dict(method="POST", path=f"{_PREFIX}/sourceedit/user/{c.actor}/tree/{c.tree_id}/repository",
+                body={"name": f["name"], **{key: str(f.get(name) or "") for name, key in _REPO.items()}})
+
+
+@operation("source-set-repository", summary="Link a repository to a source.", risk=EDIT, required=("source_id", "repository_id"),
+           undo="not undoable", example="--set source_id=380000001 --set repository_id=250000001", success=lambda d: True,
+           notes="person is only the page used for the pre-flight check.")
+def _source_set_repository(c, f):
+    _need(_ID.match(str(f.get("source_id", ""))) and _ID.match(str(f.get("repository_id", ""))))
+    return dict(method="PUT", path=f"{_PREFIX}/sourceedit/user/{c.actor}/tree/{c.tree_id}/source/{f['source_id']}/reference",
+                body={"repositoryId": str(f["repository_id"]), "actionType": "attach"})
 
 
 @operation("source-delete", summary="Permanently delete a custom source, and every citation of it, from the tree.", risk=DESTRUCTIVE,
@@ -195,14 +249,28 @@ def _source_delete(c, f):
 
 
 @operation("citation-add", summary="Cite an existing source on a person.", risk=ADDITIVE, required=("title", "source_id"),
-           optional=("url",), undo="journal undo is not available; use citation-remove",
-           example="--set source_id=380000001 --set title='page 12, line 4'",
-           notes="title is the citation detail text. Returns ids.gid, the new citation id.",
+           optional=("url",) + tuple(_CIT), undo="journal undo is not available; use citation-remove",
+           example="--set source_id=380000001 --set title='page 12, line 4' --set date='1 Jan 1900'",
+           notes="title is the citation detail text. date, other_info and transcription are saved with a second request. "
+                 "Returns ids.gid, the new citation id.",
            success=lambda d: isinstance(d, dict) and isinstance(d.get("gid"), dict))
 def _citation_add(c, f):
     _need(f.get("title") and _ID.match(str(f.get("source_id", ""))))
-    return dict(method="POST", path=f"{_PREFIX}/sourceedit/user/{c.actor}/{c.person}/citation",
-                body={"title": f["title"], "url": f.get("url", ""), "sourceId": str(f["source_id"])})
+    req = dict(method="POST", path=f"{_PREFIX}/sourceedit/user/{c.actor}/{c.person}/citation",
+               body={"title": f["title"], "url": f.get("url", ""), "sourceId": str(f["source_id"])})
+    if any(f.get(k) for k in _CIT):
+        req["then"] = dict(method="PUT", path=f"{_PREFIX}/sourceedit/user/{c.actor}/{c.person}/citation/{{id}}", body=_cit_body(f))
+    return req
+
+
+@operation("citation-edit", summary="Change a citation: details, web address, date, other information, transcription.", risk=EDIT,
+           required=("citation_id", "source_id", "title"), optional=("url",) + tuple(_CIT), undo="not undoable",
+           example="--set citation_id=600000000001 --set source_id=380000001 --set title='page 12' --set transcription='...'",
+           notes="Replaces every citation field: fields you leave out are cleared, so give them all.",
+           success=lambda d: True)
+def _citation_edit(c, f):
+    _need(f.get("title") and _ID.match(str(f.get("source_id", ""))) and _ID.match(str(f.get("citation_id", ""))))
+    return dict(method="PUT", path=f"{_PREFIX}/sourceedit/user/{c.actor}/{c.person}/citation/{f['citation_id']}", body=_cit_body(f))
 
 
 @operation("citation-remove", summary="Remove a citation from a person.", risk=DESTRUCTIVE, required=("citation_id",),

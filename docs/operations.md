@@ -21,8 +21,12 @@ Risk classes:
 | [`relative-add`](#relative-add) | structural | `relation`, `status` | Create a new person and link them to this person as a relative. |
 | [`person-remove`](#person-remove) | destructive | - | Permanently delete a person from the tree. |
 | [`source-create`](#source-create) | additive | `title` | Create a custom source in the tree. |
+| [`source-edit`](#source-edit) | edit | `source_id` | Change a source's fields. Fields you do not give keep their current values. |
+| [`repository-create`](#repository-create) | additive | `name` | Create a repository (archive, library, website) in the tree. |
+| [`source-set-repository`](#source-set-repository) | edit | `source_id`, `repository_id` | Link a repository to a source. |
 | [`source-delete`](#source-delete) | destructive | `source_id` | Permanently delete a custom source, and every citation of it, from the tree. |
 | [`citation-add`](#citation-add) | additive | `title`, `source_id` | Cite an existing source on a person. |
+| [`citation-edit`](#citation-edit) | edit | `citation_id`, `source_id`, `title` | Change a citation: details, web address, date, other information, transcription. |
 | [`citation-remove`](#citation-remove) | destructive | `citation_id` | Remove a citation from a person. |
 | [`fact-attach-source`](#fact-attach-source) | additive | `--assertion`, `citation_id` | Attach an existing citation to a fact. |
 | [`fact-detach-source`](#fact-detach-source) | edit | `--assertion`, `citation_id` | Detach a citation from a fact. |
@@ -113,12 +117,54 @@ Create a custom source in the tree.
 
 - **Risk:** additive
 - **Required:** `title`
-- **Optional:** -
+- **Optional:** `author`, `publisher`, `publication_place`, `publication_date`, `call_number`, `refn`, `note`, `repository_id`
 - **Undo:** `journal undo` deletes the source with source-delete
-- **Notes:** Returns ids.gid, the new source id (use it as source_id).
+- **Notes:** Returns ids.gid, the new source id (use it as source_id). Any field beyond title is saved with a second request; progress shows how far it got. author, publisher, publication_place, publication_date, call_number, refn, note; repository_id links a repository from repository-create.
 
 ```bash
-ancestry write source-create --tree TREE --person PERSON --set title='1900 census, Springfield IL' --confirm-tree TREE --live
+ancestry write source-create --tree TREE --person PERSON --set title='1900 census, Springfield IL' --set author='US Census Bureau' --set publication_date=1900 --confirm-tree TREE --live
+```
+
+## source-edit
+
+Change a source's fields. Fields you do not give keep their current values.
+
+- **Risk:** edit
+- **Required:** `source_id`
+- **Optional:** `title`, `author`, `publisher`, `publication_place`, `publication_date`, `call_number`, `refn`, `note`, `repository_id`
+- **Undo:** not undoable
+- **Notes:** person is only the page used for the pre-flight check. Current values are read from the source list first.
+
+```bash
+ancestry write source-edit --tree TREE --person PERSON --set source_id=380000001 --set publisher='Government Printing Office' --confirm-tree TREE --live
+```
+
+## repository-create
+
+Create a repository (archive, library, website) in the tree.
+
+- **Risk:** additive
+- **Required:** `name`
+- **Optional:** `address`, `phone`, `email`, `call_number`, `refn`, `note`
+- **Undo:** not undoable: remove it in the Ancestry UI
+- **Notes:** Returns ids.gid, the repository id (use it as repository_id).
+
+```bash
+ancestry write repository-create --tree TREE --person PERSON --set name='Ohio History Connection' --set address='800 E 17th Ave, Columbus OH' --confirm-tree TREE --live
+```
+
+## source-set-repository
+
+Link a repository to a source.
+
+- **Risk:** edit
+- **Required:** `source_id`, `repository_id`
+- **Optional:** -
+- **Undo:** not undoable
+- **Notes:** person is only the page used for the pre-flight check.
+
+```bash
+ancestry write source-set-repository --tree TREE --person PERSON --set source_id=380000001 --set repository_id=250000001 --confirm-tree TREE --live
 ```
 
 ## source-delete
@@ -141,12 +187,26 @@ Cite an existing source on a person.
 
 - **Risk:** additive
 - **Required:** `title`, `source_id`
-- **Optional:** `url`
+- **Optional:** `url`, `date`, `other_info`, `transcription`
 - **Undo:** journal undo is not available; use citation-remove
-- **Notes:** title is the citation detail text. Returns ids.gid, the new citation id.
+- **Notes:** title is the citation detail text. date, other_info and transcription are saved with a second request. Returns ids.gid, the new citation id.
 
 ```bash
-ancestry write citation-add --tree TREE --person PERSON --set source_id=380000001 --set title='page 12, line 4' --confirm-tree TREE --live
+ancestry write citation-add --tree TREE --person PERSON --set source_id=380000001 --set title='page 12, line 4' --set date='1 Jan 1900' --confirm-tree TREE --live
+```
+
+## citation-edit
+
+Change a citation: details, web address, date, other information, transcription.
+
+- **Risk:** edit
+- **Required:** `citation_id`, `source_id`, `title`
+- **Optional:** `url`, `date`, `other_info`, `transcription`
+- **Undo:** not undoable
+- **Notes:** Replaces every citation field: fields you leave out are cleared, so give them all.
+
+```bash
+ancestry write citation-edit --tree TREE --person PERSON --set citation_id=600000000001 --set source_id=380000001 --set title='page 12' --set transcription='...' --confirm-tree TREE --live
 ```
 
 ## citation-remove

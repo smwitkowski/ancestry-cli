@@ -61,3 +61,17 @@ def test_source_delete_title_guard(monkeypatch):
     sender._check_source_title(W, {"source_id": "9", "expect_title": "Real"})
     monkeypatch.setattr("ancestry_cli.journal._rows", lambda: [{"op": "source-create", "tree_id": 5, "ids": {"gid": "9"}}, {"resolved": 1}])
     sender._check_source_title(W, {"source_id": "9"})
+
+
+def test_source_and_citation_field_builders():
+    from ancestry_cli import ops
+    r = ops.build("source-create", tree_id=5, person_id=7, title="T", author="A", repository_id="9", actor="g")
+    assert r["body"] == {"title": "T"} and r["then"]["method"] == "PUT" and r["then"]["path"].endswith("/source/{id}")
+    assert r["then"]["body"] == {"title": "T", "auth": "A", "pub": "", "publ": "", "pubd": "", "cn": "", "note": "", "refn": "",
+                                 "repositoryId": "9"}
+    assert "then" not in ops.build("source-create", tree_id=5, person_id=7, title="T", actor="g")
+    r = ops.build("citation-add", tree_id=5, person_id=7, title="T", source_id="3", date="1900", actor="g")
+    assert r["then"]["body"] == {"title": "T", "url": "", "d": "1900", "oi": "", "trans": "", "sourceId": "3"}
+    r = ops.build("citation-edit", tree_id=5, person_id=7, citation_id="4", title="T", source_id="3", transcription="x", actor="g")
+    assert r["method"] == "PUT" and r["body"]["trans"] == "x"
+    assert ops.build("repository-create", tree_id=5, person_id=7, name="R", address="a", actor="g")["body"]["adr"] == "a"
