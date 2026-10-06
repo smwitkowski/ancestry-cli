@@ -636,6 +636,50 @@ def _run(
         body_b64=body_b64))
 
 
+async def _image_async(browser_ws, target, collection, image_id, record_id, scale, timeout):
+    async with websockets.connect(browser_ws, max_size=64 * 1024 * 1024, open_timeout=timeout) as websocket:
+        cdp = _CDP(websocket)
+        session_id = (await cdp.call("Target.attachToTarget", {"targetId": target["id"], "flatten": True}))["sessionId"]
+        try:
+            viewer = f"/imageviewer/collections/{collection}/images/{image_id}" + (f"?pId={record_id}" if record_id else "")
+            js = """(async()=>{const cfg=%s;
+              const page=await (await fetch(cfg.viewer,{credentials:'include'})).text();
+              const re=new RegExp('/api/media/retrieval/v2/image/namespaces/'+cfg.collection+'/media/'+cfg.image+'[.]jpg[?]securitytoken=[A-Za-z0-9]+');
+              const m=page.match(re); if(!m) return {error:'image-url-not-found'};
+              const r=await fetch(m[0]+'&download=false&client=imageviewer-ui&imagequality=HighQuality&scale='+cfg.scale,{credentials:'include'});
+              const b=await r.blob(); const fr=new FileReader();
+              const b64=await new Promise(res=>{fr.onload=()=>res(fr.result.split(',')[1]);fr.readAsDataURL(b)});
+              return {status:r.status,type:r.headers.get('content-type'),b64:b64}})()""" % json.dumps(
+                {"viewer": viewer, "collection": str(collection), "image": image_id, "scale": str(scale)})
+            result = await cdp.call("Runtime.evaluate", {"expression": js, "awaitPromise": True, "returnByValue": True,
+                                                         "userGesture": False}, session_id=session_id)
+            if result.get("exceptionDetails"):
+                raise BridgeError("page-context image fetch raised an exception")
+            return (result.get("result") or {}).get("value") or {}
+        finally:
+            try:
+                await cdp.call("Target.detachFromTarget", {"sessionId": session_id})
+            except Exception:
+                pass
+
+
+def fetch_record_image(cdp_url, target_id, collection, image_id, record_id=None, scale=1, timeout=60.0):
+    """Read-only: fetch one record image through the signed-in tab. The image URL's security token is read from the viewer
+    page and used inside the page; it never leaves the browser. Returns (status, content_type, bytes)."""
+    import base64
+    if not re.fullmatch(r"[0-9]{1,9}", str(collection)) or not re.fullmatch(r"[0-9A-Za-z_\-]{1,64}", str(image_id)) \
+            or (record_id and not re.fullmatch(r"[0-9]{1,15}", str(record_id))) or not re.fullmatch(r"[0-9](\.[0-9]+)?", str(scale)):
+        raise BridgeError("invalid image arguments")
+    target = _target_for(cdp_url, target_id)
+    browser_ws = _cdp_json(cdp_url, "/json/version").get("webSocketDebuggerUrl")
+    if not browser_ws:
+        raise BridgeError("Chrome CDP did not expose a browser WebSocket")
+    value = asyncio.run(_image_async(browser_ws, target, collection, image_id, record_id, scale, timeout))
+    if value.get("error"):
+        raise BridgeError(str(value["error"]))
+    return int(value.get("status") or 0), str(value.get("type") or ""), base64.b64decode(value.get("b64") or "")
+
+
 def summarize_response(response: BrowserResponse) -> dict[str, Any]:
     """Return safe response-shape evidence without returning the body."""
 

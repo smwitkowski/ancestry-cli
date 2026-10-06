@@ -51,6 +51,12 @@ call_number, refn, note and repository_id; `write repository-create` makes a rep
 `write source-set-repository` links one; `write citation-add` and `citation-edit` take date, other_info, transcription and url.
 `citation-edit` replaces every citation field (omitted ones are cleared); `source-edit` keeps fields you do not give.
 
+### `ancestry read image --collection C (--record R | --image I) --out FILE [--crop x,y,w,h]`
+Saves a record image to a new file (mode 600). Take the ids from a search result (`collectionId`, `recordId`, `imageIds`); with
+only `--record` the image id is looked up from the record. `--crop` is pixels of the full image, or fractions of it when all four
+numbers are 1 or less (`0.1,0.1,0.5,0.3` = left 10%, top 10%, half the width, 30% of the height); the result reports the full and
+saved sizes so you can adjust. The image's signed URL is used inside the browser and never printed.
+
 ### `ancestry apply --manifest FILE [--live]`
 Runs a batch of writes from a JSON file: `{"tree": "alias or id", "confirm_tree": id (outside sandbox trees), "operations":
 [{"op": "fact-add", "person": 111, "assertion": 222, "set": {"eventType": "Birth", "date": "1900"}}]}`. Without `--live` every step is

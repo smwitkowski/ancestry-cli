@@ -96,3 +96,12 @@ def test_apply_canary_stops_and_receipt(tmp_path, monkeypatch):
     assert out["ok"] and [r["index"] for r in json.loads(m.read_text())["receipt"]] == [0, 1, 2]
     live_calls = len([c for c in calls if not c["dry_run"]])
     assert ap.apply(manifest=str(m), live=True)["ok"] and len([c for c in calls if not c["dry_run"]]) == live_calls   # resume skips done steps
+
+
+def test_image_crop_box():
+    import pytest
+    from ancestry_cli.images import _crop_box
+    assert _crop_box("0.1,0.1,0.5,0.5", 1000, 500) == (100, 50, 600, 300)
+    assert _crop_box("10,20,30,40", 1000, 500) == (10, 20, 40, 60)
+    with pytest.raises(ValueError):
+        _crop_box("900,0,200,10", 1000, 500)

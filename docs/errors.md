@@ -62,6 +62,7 @@ Exit codes: `0` ok, `1` failed with nothing changed, `2` bad usage, `3` state un
 | `source-not-found` | no | no | No source with that id in this tree (or it was already deleted). | edit-args: Check source_id. |
 | `invalid-manifest` | no | no | The manifest is not valid JSON in the documented shape, or a step failed validation (see `problems`). Nothing was sent. | edit-args: Fix the manifest; see `ancestry apply --help`. |
 | `canary-no-change` | no | no | The first step (the canary) was accepted but changed nothing. The batch stopped; check it with `ancestry journal verify`. | run: `ancestry journal list` |
+| `image-unavailable` | yes | no | The record image could not be fetched (no image URL on the viewer page, or no image rights). Check the collection and image ids from a search result; nothing was changed. | run: `ancestry doctor` |
 | `fact-not-found` | no | no | That assertion id is not on this person. Use `ancestry person` to list fact ids. | run: `ancestry person --tree {tree_id} --person {person_id}` |
 | `invalid-media-file` | no | no | Use an absolute path to a png, jpg, gif or webp file up to 25 MB. | edit-args: Use an absolute path to a png, jpg, gif or webp file up to 25 MB. |
 | `unknown-tag` | no | no | Unknown tag name. Use a listed tag name or its numeric id. | edit-args: Use a tag name from `did_you_mean`, or a numeric tag id. |

@@ -109,7 +109,7 @@ def build_parser():
     _modes(p)
 
     p = subs.add_parser("read", help="search, hints, records and any known read endpoint", allow_abbrev=False)
-    p.add_argument("action", choices=("list", "get", "search", "hints", "record"))
+    p.add_argument("action", choices=("list", "get", "search", "hints", "record", "image"))
     p.add_argument("name", nargs="?", help="endpoint name for `get`")
     _tree_arg(p)
     p.add_argument("--person", dest="person_id", type=int)
@@ -121,6 +121,9 @@ def build_parser():
     p.add_argument("--collection", type=int)
     p.add_argument("--record", dest="record_id", type=int)
     p.add_argument("--counts", action="store_true")
+    p.add_argument("--image", dest="image_id", help="image id, for `read image` (from a search result's imageIds)")
+    p.add_argument("--crop", help="x,y,w,h in pixels, or fractions of the image (all <= 1), for `read image`")
+    p.add_argument("--out", help="new file to write, for `read image`")
 
     p = subs.add_parser("collections", help="which record collections have hits (find), what one searches on (describe), what we have seen (list)", allow_abbrev=False)
     p.add_argument("action", choices=("find", "describe", "list"))
@@ -265,8 +268,13 @@ def _run(command, args):
         fields = _fields(args.pop("fields"))
         op = args.pop("op")
         return write(op=op, **args, **{k.replace("-", "_"): v for k, v in fields.items()})
+    if command == "read" and args["action"] == "image":
+        from .images import save
+        return save(collection=args["collection"], image_id=args["image_id"], record_id=args["record_id"], crop=args["crop"], out=args["out"])
     if command == "read":
         from .reads import read
+        for extra in ("image_id", "crop", "out"):
+            args.pop(extra, None)
         return read(**{**args, "path_params": _fields(args["path_params"]), "params": _fields(args["params"])})
     if command == "hint":
         from .hints import command as hint_command

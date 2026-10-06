@@ -110,6 +110,7 @@ ERRORS = {
     "source-not-found": Err(False, False, "No source with that id in this tree (or it was already deleted).", [_edit("Check source_id.")]),
     "invalid-manifest": Err(False, False, "The manifest is not valid JSON in the documented shape, or a step failed validation (see `problems`). Nothing was sent.", [_edit("Fix the manifest; see `ancestry apply --help`.")]),
     "canary-no-change": Err(False, False, "The first step (the canary) was accepted but changed nothing. The batch stopped; check it with `ancestry journal verify`.", [_run("ancestry", "journal", "list")]),
+    "image-unavailable": Err(True, False, "The record image could not be fetched (no image URL on the viewer page, or no image rights). Check the collection and image ids from a search result; nothing was changed.", [_run("ancestry", "doctor")]),
     "fact-not-found": Err(False, False, "That assertion id is not on this person. Use `ancestry person` to list fact ids.", [_run("ancestry", "person", "--tree", "{tree_id}", "--person", "{person_id}")]),
     "invalid-media-file": Err(False, False, "Use an absolute path to a png, jpg, gif or webp file up to 25 MB.", [_edit("Use an absolute path to a png, jpg, gif or webp file up to 25 MB.")]),
     "unknown-tag": Err(False, False, "Unknown tag name. Use a listed tag name or its numeric id.", [_edit("Use a tag name from `did_you_mean`, or a numeric tag id.")]),
