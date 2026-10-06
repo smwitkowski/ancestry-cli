@@ -159,9 +159,11 @@ def person(*, tree_id, person_id, include_living=False):
                                     for m in members if isinstance(m, dict)]
         facts = [{"assertion_id": str(f["AssertionId"]), "type": f.get("TypeString"), "date": f.get("Date"), "place": f.get("Place"),
                   "place_id": gpid(f.get("PlaceGpids")) or None, "preferred": not f.get("IsAlternate"),
-                  "description": f.get("Description"), "source_count": len(str(f.get("SourceCitationIDs") or "").split())}
+                  "description": f.get("Description"), "source_count": len(str(f.get("SourceCitationIDs") or "").split()),
+                  "citation_ids": str(f.get("SourceCitationIDs") or "").split()}
                  for f in snap["facts"] if f.get("AssertionId")]
         return {**base, "name": snap["name"], "facts": facts, "sources": len(snap["sources"]),
                 "citations": [{"citation_id": str(s["CitationId"]), "source_id": s.get("SourceId"), "custom": s.get("custom", False),
-                               "title": s.get("Title")} for s in snap["sources"] if s.get("CitationId")], "family": family}
+                               "title": s.get("Title"),
+                               "fact_ids": str(s.get("AssertionIds") or "").split()} for s in snap["sources"] if s.get("CitationId")], "family": family}
     return guarded(run)

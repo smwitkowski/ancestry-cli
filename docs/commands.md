@@ -80,6 +80,8 @@ Record collections. Ancestry publishes no full list, so this has three parts:
 - `list [--query WORDS]`: the saved catalogue, filtered by words in the title.
 Then search inside one: `ancestry read search --surname S --collection ID`.
 
+Facts in `ancestry person` carry `citation_ids`, and each entry of `citations` carries `fact_ids`, so you can see which citation is on which fact.
+
 ### `ancestry find ... --complete`
 Uses the tree's own "Find in tree" search and reads every page, so an empty result means the name is not in the tree (plain `find` uses the person picker, which may miss people). Same fields and living-person redaction as `find`.
 
