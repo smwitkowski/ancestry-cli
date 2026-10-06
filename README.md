@@ -97,4 +97,4 @@ Sister use the same route as Father/Mother/Spouse but were not individually veri
 uv sync && uv run pytest        # offline: a fake browser stands in for Chrome
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). No license has been chosen yet; add one before sharing this repository.
+See [CONTRIBUTING.md](CONTRIBUTING.md). MIT licensed (see LICENSE).
