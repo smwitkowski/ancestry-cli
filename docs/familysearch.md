@@ -19,6 +19,7 @@ If FamilySearch shows a bot check, the command stops with `familysearch-check-re
 | `familysearch record ARK` | one record: collection, citation, fields (film numbers, record number), persons with facts and roles, relationships |
 | `familysearch person PID [--sources]` | a family-tree person: facts, parents, spouses and children with PIDs, attached sources |
 | `familysearch film DGS` | catalog entry of a digital film: title, dates, place, image count, the films' contents |
+| `familysearch catalog --place P [--subject-id ID] [--years A-B] [--films] [--exact] [--limit N]` | the catalog by place: record types, then titles, then films with DGS numbers |
 | `familysearch image (--record 1:1:X \| --film DGS --image N \| --ark 3:1:X \| --das TH-...) --out FILE [--crop x,y,w,h] [--max-tiles N]` | save a record image, optionally cropped |
 
 Notes:
@@ -30,4 +31,8 @@ Notes:
   `reduction` and `saved_size`; crop tighter or raise `--max-tiles` for more detail.
 - `--record 1:1:X` uses the image the record links to (`record` lists them as `image_arks`). Many index-only records (for example the
   German baptism indexes) link no image: the command then stops with `familysearch-no-image-link` and names the record's digital film.
+- `catalog`: first call with only `--place` lists the record types (subjects) the catalog holds for that place; then call again with
+  `--subject-id` for the titles (`--years` keeps overlapping dates, `--films` adds each title's films with DGS and contents, one request
+  each). The place is matched as containing the text unless `--exact`; use the catalog's own wording (for example
+  `Germany, Bayern, Rockenhausen`) with `--exact` for one place. Feed a DGS number to `film` and `image`.
 - Not covered yet: walking a film's records by place and date.

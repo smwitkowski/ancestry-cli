@@ -65,3 +65,11 @@ def test_image_arks_come_from_artifacts_and_extra_data():
          "fields": [{"values": [{"labelId": "EXT_DATA", "text": '{"IMAGE_ARK":"https://familysearch.org/ark:/61903/3:1:DDD-EEE","X":"1"}'}]}]}
     assert fs._image_arks(g) == ["3:1:AAA-BBB-CCC", "3:1:DDD-EEE"]
     assert fs._image_arks({}) == []
+
+
+def test_catalog_inputs_and_title_years():
+    assert fs._catalog_years("Kirchenbuch, 1702-1960") == (1702, 1960) and fs._catalog_years("Kirchenbuch") is None
+    assert fs.catalog(place="x<y")["classification"] == "invalid-request"
+    assert fs.catalog(place="Rockenhausen", years="abc")["classification"] == "invalid-request"
+    fs._check({"path": "/service/search/catalog/item/olib:1485663"})
+    fs._check({"path": "/service/search/catalog/v3/search?count=20&q.place=Rockenhausen&q.subjectId=133492089"})

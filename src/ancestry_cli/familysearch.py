@@ -10,6 +10,7 @@ Reads only: FamilySearch tree writes are out of scope.
   familysearch record ARK            (1:1:XXXX-XXX or the 61903/1:1:... form)
   familysearch person PID [--sources]
   familysearch film DGS              (catalog entry and image count of a digital film)
+  familysearch catalog --place P [--subject-id ID] [--years A-B] [--films] [--exact]   (what the catalog holds for a place)
   familysearch image (--film DGS --image N | --ark 3:1:XXXX | --das TH-...) --out FILE [--crop x,y,w,h] [--max-tiles N]
 """
 from __future__ import annotations
@@ -44,6 +45,8 @@ _ALLOWED = [
     re.compile(r"/ark:/61903/1:1:[A-Z0-9-]{1,80}\?useSLS=true&useRolesOverride=false\Z"),
     re.compile(r"/service/search/hr/v2/personas\?[^#\s]{1,3000}\Z"),
     re.compile(r"/platform/users/current\Z"),
+    re.compile(r"/service/search/catalog/v3/search\?[A-Za-z0-9.%+=&_-]{1,600}\Z"),
+    re.compile(r"/service/search/catalog/item/[a-z]{2,8}:[0-9]{1,12}\Z"),
     re.compile(r"/platform/tree/persons/[A-Z0-9-]{1,12}(?:/(?:parents|spouses|children|sources))?\Z"),
     re.compile(r"/service/records/storage/dascloud/das/v2/TH-[0-9A-Za-z-]{1,60}/(?:permission|thumb_p200\.jpg)\Z"),
     re.compile(r"/service/records/storage/deepzoomcloud/dz/v1/TH-[0-9A-Za-z-]{1,60}/image\.xml\Z"),
@@ -355,6 +358,78 @@ def film(dgs):
     return _guard(run)
 
 
+# ------------------------------------------------------------------------------------------------ catalog
+_PLACE = re.compile(r"[\w .,'()-]{2,120}\Z")
+
+
+def _catalog_years(title):
+    m = re.search(r"(\d{3,4})\s*-\s*(\d{3,4})", title or "")
+    return (int(m.group(1)), int(m.group(2))) if m else None
+
+
+def catalog(*, place, subject_id=None, years=None, limit=10, films=False, exact=False):
+    """What the FamilySearch catalog holds for a place: record types (subjects), then titles, then films with their DGS numbers."""
+    if not _PLACE.match(place or ""):
+        return failure("invalid-request", problems=[{"field": "place", "issue": "invalid", "expected": "a place name"}])
+    span = None
+    if years:
+        m = re.fullmatch(r"(\d{3,4})(?:-(\d{3,4}))?", years)
+        if not m:
+            return failure("invalid-request", problems=[{"field": "years", "issue": "invalid", "expected": "1850 or 1850-1900"}])
+        span = (int(m.group(1)), int(m.group(2) or m.group(1)))
+    base = {"count": "50" if subject_id else "20", "offset": "0", "m.defaultFacets": "on", "m.queryRequireDefault": "on", "q.place": place}
+    if exact:
+        base["q.place.exact"] = "on"
+
+    def run():
+        if not subject_id:
+            q = {**base, "groupBy": "placeSubject"}
+            row, = fetch([{"method": "GET", "path": "/service/search/catalog/v3/search?" + urllib.parse.urlencode(q), "accept": "application/json"}])
+            data = _json(row)
+            subjects = [{"subject_id": h["metadataHit"]["metadata"]["identifier"]["value"],
+                         "subject": ((h["metadataHit"]["metadata"].get("title") or [{}])[0].get("value") or "").strip()}
+                        for h in data.get("searchHits", [])]
+            return {"ok": True, "classification": "familysearch-catalog", "dispatch_attempted": True, "state": "unchanged", "place": place,
+                    "total": data.get("totalHits"), "place_set_id": data.get("placeSetId"), "subjects": subjects,
+                    "next": "familysearch catalog --place PLACE --subject-id ID [--years A-B] [--films]"}
+        if not re.fullmatch(r"[0-9]{1,12}", str(subject_id)):
+            raise ValueError("subject")
+        q = {**base, "q.subjectId": str(subject_id)}
+        row, = fetch([{"method": "GET", "path": "/service/search/catalog/v3/search?" + urllib.parse.urlencode(q), "accept": "application/json"}])
+        data = _json(row)
+        items = []
+        for h in data.get("searchHits", []):
+            md = h["metadataHit"]["metadata"]
+            title = (md.get("title") or [{}])[0].get("value")
+            item = str((md.get("identifier") or {}).get("value", "")).rsplit("/", 1)[-1]
+            rng = _catalog_years(title)
+            if span and rng and (rng[1] < span[0] or rng[0] > span[1]):
+                continue
+            items.append({"item": item, "title": title, "creator": (md.get("creator") or [None])[0], "years": list(rng) if rng else None,
+                          "online": any(c.get("title") == "Online" for c in md.get("repositoryCalls", []))})
+        items = items[:max(1, min(int(limit), 30))]
+        if films and items:
+            rows = []
+            for start in range(0, len(items), 6):
+                rows += fetch([{"method": "GET", "path": f"/service/search/catalog/item/{i['item']}", "accept": "application/json"}
+                               for i in items[start:start + 6]])
+            for item, r in zip(items, rows):
+                notes = (_json(r).get("source") or {}).get("film_note") or []
+                notes = [n for n in ([notes] if isinstance(notes, dict) else notes) if isinstance(n, dict)]
+                seen, out = set(), []
+                for n in notes:
+                    film = {"film": str(n.get("filmno") or "") or None, "dgs": str(n.get("digital_film_no") or "") or None,
+                            "contents": n.get("text"), "items": n.get("items") or None}
+                    key = json.dumps(film, sort_keys=True)
+                    if key not in seen:
+                        seen.add(key)
+                        out.append(film)
+                item["films"] = out
+        return {"ok": True, "classification": "familysearch-catalog", "dispatch_attempted": True, "state": "unchanged", "place": place,
+                "subject_id": str(subject_id), "total": data.get("totalHits"), "returned": len(items), "titles": items}
+    return _guard(run)
+
+
 # ------------------------------------------------------------------------------------------------ images
 def _viewable(permission):
     """The permission endpoint answers with a colon list such as `A:ThemisPrmAnyone:B`; `Anyone` in it means any signed-in user may view."""
@@ -506,6 +581,13 @@ def build_parser():
     t.add_argument("--sources", action="store_true", help="also list the sources attached to the person")
     f = subs.add_parser("film", help="catalog entry and image count of a digital film (DGS number)")
     f.add_argument("dgs")
+    c = subs.add_parser("catalog", help="catalog by place: record types, then titles, then films with DGS numbers")
+    c.add_argument("--place", required=True, help="place name as the catalog writes it, e.g. 'Germany, Bayern, Rockenhausen'")
+    c.add_argument("--subject-id", help="a subject id from the first call (a record type such as Church records)")
+    c.add_argument("--years", help="1850 or 1850-1900: keep titles whose dates overlap")
+    c.add_argument("--limit", type=int, default=10)
+    c.add_argument("--films", action="store_true", help="also fetch each title's films (one request each, 3 s apart)")
+    c.add_argument("--exact", action="store_true", help="exact place match instead of containing")
     i = subs.add_parser("image", help="save a record image, optionally cropped")
     i.add_argument("--film", dest="film_dgs", help="digital film (DGS) number, with --image")
     i.add_argument("--image", dest="number", type=int, help="image number on the film, starting at 1")
@@ -538,6 +620,9 @@ def main(argv=None):
         result = person(args["pid"], sources=args["sources"])
     elif command == "film":
         result = film(args["dgs"])
+    elif command == "catalog":
+        result = catalog(place=args["place"], subject_id=args["subject_id"], years=args["years"], limit=args["limit"], films=args["films"],
+                         exact=args["exact"])
     else:
         result = image(out=args["out"], film_dgs=args["film_dgs"], number=args["number"], ark=args["ark"], das=args["das"],
                        crop=args["crop"], max_tiles=args["max_tiles"], record_ark=args["record_ark"])
