@@ -1,4 +1,4 @@
-"""Merge-job payload builders, vendored verbatim from the tree-vault helper (pure functions; they only read the
+"""Merge-job payload builders, vendored verbatim from an earlier prototype (pure functions; they only read the
 comparison response). Source: ancestry_tools._build_upload_body / _build_confirmation_body."""
 from __future__ import annotations
 

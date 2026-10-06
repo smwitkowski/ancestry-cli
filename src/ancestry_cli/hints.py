@@ -3,7 +3,7 @@
 Accepting follows the web app's own merge flow:
     GET comparison -> POST merge/job/upload -> poll merge/job/status -> POST merge/job/post/confirmation
 `plan` runs the first step and builds the upload body (a dry-run reports counts only); `commit` runs the rest.
-The upload body comes from `merge_payload` (vendored from the tree-vault helper), so field selection matches the
+The upload body comes from `merge_payload` (vendored from an earlier prototype), so field selection matches the
 web app's default: new facts are added, existing facts are cited, no alternate names are created.
 """
 from __future__ import annotations

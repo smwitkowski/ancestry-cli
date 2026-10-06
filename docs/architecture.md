@@ -59,7 +59,7 @@ stops all calls.
 
 ## Vendored bridge
 
-`vendor/ancestry_browser_bridge.py` and `vendor/api_endpoints.py` are copies of the older `tree-vault` scripts, with these
+`vendor/ancestry_browser_bridge.py` and `vendor/api_endpoints.py` are copies of an earlier internal prototype, with these
 changes: the endpoint inventory is imported relatively; the default CDP port is 9224; `ChromeBrowserSession` gained
 `patch()`, `delete()` and `put_binary()` (binary bodies travel as base64 and are rebuilt as bytes in the page); and the
 per-upload `securityToken` is the single token-named query parameter allowed (only in `put_binary`). The bridge refuses any
