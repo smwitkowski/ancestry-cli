@@ -71,7 +71,7 @@ see what can be written. Every command prints one JSON object; follow `state` an
 
 ## Commands at a glance
 
-`doctor` · `whoami [--pin]` · `trees` · `find` · `person` · `read` (search, hints, record, any known read) · `collections` (find, describe, list) · `sources` · `match` · `apply` · `hint list|accept` ·
+`doctor` · `whoami [--pin]` · `trees` · `find` · `person` · `read` (search, hints, record, any known read) · `collections` (find, describe, list) · `sources` · `match` · `newspapers` · `apply` · `hint list|accept` ·
 `write OP` (28 operations, `ancestry ops` describes them) · `journal list|undo|verify|resolve` · `lane reset`.
 Details and flags: [docs/commands.md](docs/commands.md).
 

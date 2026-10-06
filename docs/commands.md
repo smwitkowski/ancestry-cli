@@ -49,6 +49,14 @@ Each candidate has `match_counts` (exact / similar / different), a `tag` (likely
 a heuristic on the counts, not proof), and up to three explanations. `attached` means all counts are zero, which the explainer
 returns for records Ancestry already links to the person. Read the record before using it.
 
+### `ancestry newspapers page --page ID`
+Newspapers.com page facts, read from the signed-in Newspapers.com tab (a second tab in the same Chrome; sign in there by hand, Ancestry
+sign-in works, and pass its Cloudflare check once if it asks). The page id is in the Ancestry record's "View image" link
+(`newspapers.com/image/<ID>/`). Returns the issue title, `publisher_extra`, `page_gated` (the archive page's own paywall notice),
+`logged_in`, `subscriber`, `more_articles` (not loaded) and the "Headlines & Names Mentioned" index per article. The names are public
+even when the account cannot open the page. It cannot read page text or save images: for a non-subscriber the viewer shows an
+upgrade notice for Publisher Extra papers. Tabs on other sites do not disturb the Ancestry lane.
+
 ### `ancestry sources --tree T [--person P] [--query WORDS]`
 Lists the tree's custom sources (id, title, author, publisher, call number, repository id), optionally only titles containing every
 word. Run it before `write source-create` so a source is reused, not duplicated. `--person` is optional once the account is pinned.

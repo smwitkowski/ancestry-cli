@@ -136,3 +136,15 @@ def test_match_tags():
     assert tag({"exact": 1, "similar": 0, "different": 3}) == "conflict"
     assert tag({"exact": 0, "similar": 2, "different": 0}) == "namesake"
     assert tag({"exact": 2, "similar": 3, "different": 1}) == "maybe"
+
+
+def test_newspapers_page_parse():
+    from ancestry_cli.newspapers import parse
+    html = ('<html><head><title>Daily - Lebanon | Page 2 archive - Newspapers.com™</title></head><body>'
+            '<script>{"isLoggedIn":true,"isSubscriber":false}</script>Get access to this page with a Subscription! A Publisher Extra® Newspaper '
+            '<a href="/image/55/?article=aaa">Funerals</a><a href="/image/55/?article=aaa&terms=Jo%20Doe">Jo Doe</a>'
+            '<a href="/image/55/?article=bbb">Other</a> Show 39 more articles</body></html>')
+    info = parse(html, "55")
+    assert info["title"] == "Daily - Lebanon | Page 2 archive" and info["publisher_extra"] and info["page_gated"]
+    assert info["logged_in"] and info["subscriber"] is False and info["more_articles"] == 39
+    assert info["articles"][0] == {"article": "aaa", "headline": "Funerals", "names": ["Jo Doe"]}

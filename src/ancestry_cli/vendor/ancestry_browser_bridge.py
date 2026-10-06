@@ -674,6 +674,39 @@ async def _image_async(browser_ws, target, collection, image_id, record_id, scal
                 pass
 
 
+async def _newspage_async(browser_ws, target, path, timeout):
+    async with websockets.connect(browser_ws, max_size=32 * 1024 * 1024, open_timeout=timeout) as websocket:
+        cdp = _CDP(websocket)
+        session_id = (await cdp.call("Target.attachToTarget", {"targetId": target["id"], "flatten": True}))["sessionId"]
+        try:
+            js = "(async()=>{const r=await fetch(%s,{credentials:'include'});return {status:r.status,body:await r.text()}})()" % json.dumps(path)
+            result = await cdp.call("Runtime.evaluate", {"expression": js, "awaitPromise": True, "returnByValue": True,
+                                                         "userGesture": False}, session_id=session_id)
+            if result.get("exceptionDetails"):
+                raise BridgeError("page-context fetch raised an exception")
+            return (result.get("result") or {}).get("value") or {}
+        finally:
+            try:
+                await cdp.call("Target.detachFromTarget", {"sessionId": session_id})
+            except Exception:
+                pass
+
+
+def fetch_newspage(cdp_url, target_id, page_id, timeout=60.0):
+    """Read-only: GET https://www.newspapers.com/newspage/<id>/ from inside the signed-in Newspapers.com tab. (status, html)."""
+    if not re.fullmatch(r"[0-9]{1,12}", str(page_id)):
+        raise BridgeError("invalid page id")
+    target = next((t for t in _cdp_json(cdp_url, "/json/list") if t.get("type") == "page" and t.get("id") == target_id
+                   and urllib.parse.urlsplit(t.get("url", "")).netloc == "www.newspapers.com"), None)
+    if target is None:
+        raise BridgeError("no Newspapers.com page is exposed by Chrome CDP")
+    browser_ws = _cdp_json(cdp_url, "/json/version").get("webSocketDebuggerUrl")
+    if not browser_ws:
+        raise BridgeError("Chrome CDP did not expose a browser WebSocket")
+    value = asyncio.run(_newspage_async(browser_ws, target, f"/newspage/{page_id}/", timeout))
+    return int(value.get("status") or 0), str(value.get("body") or "")
+
+
 def fetch_record_image(cdp_url, target_id, collection, image_id, record_id=None, scale=1, timeout=60.0):
     """Read-only: fetch one record image through the signed-in tab. The image URL's security token is read from the viewer
     page and used inside the page; it never leaves the browser. Returns (status, content_type, bytes)."""

@@ -138,6 +138,10 @@ def build_parser():
     p.add_argument("--collection", type=int)
     p.add_argument("--limit", type=int, default=5, help="how many hits to score (max 20)")
 
+    p = subs.add_parser("newspapers", help="Newspapers.com page facts: paper, access, names mentioned (needs your signed-in tab)", allow_abbrev=False)
+    p.add_argument("action", choices=("page",))
+    p.add_argument("--page", dest="page_id", help="Newspapers.com page id (from the Ancestry record's View image link)")
+
     p = subs.add_parser("sources", help="list or find the tree's custom sources by title (reuse before creating)", allow_abbrev=False)
     _tree_arg(p)
     p.add_argument("--person", dest="person_id", type=int, help="optional if the account is pinned (`whoami --pin`)")
@@ -234,6 +238,9 @@ def _run(command, args):
     if command == "init":
         from .setup import init
         return init()
+    if command == "newspapers":
+        from .newspapers import page as newspapers_page
+        return newspapers_page(page_id=args["page_id"])
     if command == "match":
         from .match import match
         return match(**args)

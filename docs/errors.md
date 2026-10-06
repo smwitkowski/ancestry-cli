@@ -63,6 +63,11 @@ Exit codes: `0` ok, `1` failed with nothing changed, `2` bad usage, `3` state un
 | `invalid-manifest` | no | no | The manifest is not valid JSON in the documented shape, or a step failed validation (see `problems`). Nothing was sent. | edit-args: Fix the manifest; see `ancestry apply --help`. |
 | `canary-no-change` | no | no | The first step (the canary) was accepted but changed nothing. The batch stopped; check it with `ancestry journal verify`. | run: `ancestry journal list` |
 | `image-unavailable` | yes | no | The record image could not be fetched (no image URL on the viewer page, or no image rights). Check the collection and image ids from a search result; nothing was changed. | run: `ancestry doctor` |
+| `newspapers-tab-required` | no | yes | Open https://www.newspapers.com in one tab of the Chrome on this port and sign in by hand (Ancestry sign-in works). Leave the Ancestry tab alone. | human: Open Newspapers.com in a tab and sign in.<br>run: `ancestry doctor` *(after-human)* |
+| `newspapers-tab-ambiguous` | no | yes | More than one Newspapers.com tab is open; leave exactly one. | human: Close the extra Newspapers.com tabs. |
+| `newspapers-check-required` | no | yes | Newspapers.com is showing its bot check. Pass it by hand in that tab, then retry. | human: Pass the Newspapers.com check in its tab. |
+| `newspapers-sign-in-required` | no | yes | The Newspapers.com tab is not signed in. Sign in by hand (Ancestry sign-in works), then retry. | human: Sign in to Newspapers.com in its tab. |
+| `newspapers-unavailable` | yes | no | Newspapers.com did not return the page (see status). Check the page id. | edit-args: Check the page id. |
 | `fact-not-found` | no | no | That assertion id is not on this person. Use `ancestry person` to list fact ids. | run: `ancestry person --tree {tree_id} --person {person_id}` |
 | `invalid-media-file` | no | no | Use an absolute path to a png, jpg, gif or webp file up to 25 MB. | edit-args: Use an absolute path to a png, jpg, gif or webp file up to 25 MB. |
 | `unknown-tag` | no | no | Unknown tag name. Use a listed tag name or its numeric id. | edit-args: Use a tag name from `did_you_mean`, or a numeric tag id. |
