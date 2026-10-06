@@ -144,6 +144,25 @@ def _open(w, bridge):
 
 
 # ---------------------------------------------------------------------------------------------------- step 2: prepare
+def _check_source_title(w, fields):
+    """Refuse to delete a source unless its live title matches expect_title (or this tool's journal created it)."""
+    from .journal import _rows
+    expected = fields.get("expect_title")
+    ours = any(r.get("op") == "source-create" and r.get("tree_id") == w.tree_id and str(r.get("ids", {}).get("gid")) == str(fields["source_id"])
+               for r in _rows())
+    if expected is None and not ours:
+        raise _Refused("source-title-required")
+    path = f"/family-tree/person/sourceedit/user/{w.actor}/tree/{w.tree_id}/source/{fields['source_id']}"
+    got = w.inner.request("GET", _BASE + path, timeout=30, allow_redirects=False,
+                          _validated_endpoint={"method": "GET", "path": path, "side_effect": False})
+    try:
+        title = json.loads(got.text)["title"]
+    except Exception:
+        raise _Refused("source-not-found") from None
+    if expected is not None and title != expected:
+        raise _Refused("source-title-mismatch")
+
+
 def _prepare(w, fields):
     """Fill in what only the page knows. Returns the completed fields."""
     fields = dict(fields)
@@ -155,6 +174,8 @@ def _prepare(w, fields):
                               _validated_endpoint={"method": "GET", "path": path, "side_effect": False})
         fields["name_id"], fields["gender_id"] = _anchor_ids(got.text)
         fields.setdefault("anchor_gender", "")
+    elif w.op == "source-delete":
+        _check_source_title(w, fields)
     elif w.op == "fact-edit":
         current = restore_fields(w.before, fields.get("assertion_id"))     # an edit is a patch: keep what was not given
         if current is None:

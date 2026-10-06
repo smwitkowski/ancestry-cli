@@ -57,6 +57,9 @@ Exit codes: `0` ok, `1` failed with nothing changed, `2` bad usage, `3` state un
 | `usage-error` | no | no | Check `ancestry <command> --help`. | edit-args: Fix the arguments listed in `problems`. |
 | `configuration-error` | no | no | A tree id, option or combination is invalid for this command. Check `ancestry <command> --help`. | edit-args: Check the tree id and the options. |
 | `invalid-write-request` | no | no | A required field is missing or not allowed for this operation. See `problems` and `ancestry ops <op>`. | run: `ancestry ops {op}`<br>edit-args: Fix the fields listed in `problems`. |
+| `source-title-required` | no | no | Deleting a source needs --set expect_title='<its exact title>' so a wrong id cannot delete the wrong source. | edit-args: Add expect_title with the source's exact title. |
+| `source-title-mismatch` | no | no | The source with that id has a different title than expect_title. Nothing was deleted; check the source id. | edit-args: Check source_id and expect_title. |
+| `source-not-found` | no | no | No source with that id in this tree (or it was already deleted). | edit-args: Check source_id. |
 | `fact-not-found` | no | no | That assertion id is not on this person. Use `ancestry person` to list fact ids. | run: `ancestry person --tree {tree_id} --person {person_id}` |
 | `invalid-media-file` | no | no | Use an absolute path to a png, jpg, gif or webp file up to 25 MB. | edit-args: Use an absolute path to a png, jpg, gif or webp file up to 25 MB. |
 | `unknown-tag` | no | no | Unknown tag name. Use a listed tag name or its numeric id. | edit-args: Use a tag name from `did_you_mean`, or a numeric tag id. |

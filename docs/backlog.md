@@ -13,6 +13,6 @@
 - Dry-run on a non-writable tree shows a partial request body; load the live form or label it partial.
 - `journal undo --live` returns no `state` or read-back; writes do.
 - The lane needs exactly one page per Chrome; bind to a tab by origin instead so other sites can share the browser.
-- Custom sources cannot be deleted (no route captured); put UI steps in each `manual_cleanup` entry.
 - `find` uses the person picker and may not be exhaustive; document it and add a complete in-tree search.
+- `source-delete` cannot yet warn with the citation count (no route known that lists a source's citations).
 - Add an actor label (for example `ANCESTRY_CLI_ACTOR`) to journal entries when homes are shared.

@@ -38,3 +38,26 @@ def test_source_delete_request_and_undo_of_source_create():
     assert r["method"] == "DELETE" and r["path"].endswith("/tree/5/source/780832148") and r["body"] is None
     inv = journal.inverse("source-create", 5, 7, {"title": "t"}, {"gid": "780832148"})
     assert inv == {"op": "source-delete", "person_id": 7, "fields": {"source_id": "780832148"}}
+
+
+def test_source_delete_title_guard(monkeypatch):
+    import json
+    import pytest
+    from ancestry_cli import sender
+
+    class W:
+        tree_id, actor = 5, "g"
+        class inner:
+            @staticmethod
+            def request(*a, **k):
+                return type("R", (), {"text": json.dumps({"title": "Real"})})()
+    monkeypatch.setattr("ancestry_cli.journal._rows", lambda: [])
+    with pytest.raises(sender._Refused) as e:
+        sender._check_source_title(W, {"source_id": "9"})
+    assert e.value.code == "source-title-required"
+    with pytest.raises(sender._Refused) as e:
+        sender._check_source_title(W, {"source_id": "9", "expect_title": "Other"})
+    assert e.value.code == "source-title-mismatch"
+    sender._check_source_title(W, {"source_id": "9", "expect_title": "Real"})
+    monkeypatch.setattr("ancestry_cli.journal._rows", lambda: [{"op": "source-create", "tree_id": 5, "ids": {"gid": "9"}}, {"resolved": 1}])
+    sender._check_source_title(W, {"source_id": "9"})

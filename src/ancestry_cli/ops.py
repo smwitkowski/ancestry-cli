@@ -184,8 +184,10 @@ def _source_create(c, f):
 
 
 @operation("source-delete", summary="Permanently delete a custom source, and every citation of it, from the tree.", risk=DESTRUCTIVE,
-           required=("source_id",), undo="not undoable", example="--set source_id=380000001",
-           notes="Citations of the source disappear from every person. person is only the page used for the pre-flight check.",
+           required=("source_id",), optional=("expect_title",), undo="not undoable",
+           example="--set source_id=380000001 --set expect_title='1900 census, Springfield IL'",
+           notes="expect_title is required unless this tool created the source (the journal knows it); the live delete is refused if the "
+                 "source's title differs. Citations of the source disappear from every person. person is only the page used for the pre-flight check.",
            success=lambda d: d == {})
 def _source_delete(c, f):
     _need(_ID.match(str(f.get("source_id", ""))))

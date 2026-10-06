@@ -769,6 +769,12 @@ ENDPOINTS = [
         "notes": "Create a custom source. Response {gid:{v:'<sourceId>:n:n'},title,cd,md}; sourceId is the first gid segment.",
     },
     {
+        "group": "people", "name": "source_get", "method": "GET",
+        "path": "/family-tree/person/sourceedit/user/{userId}/tree/{treeId}/source/{sourceId}",
+        "kind": "json", "source": "probe 2026-10-06",
+        "notes": "Probe: read one custom source (title). Unverified until confirmed on a sandbox source.",
+    },
+    {
         "group": "writes", "name": "source_delete", "method": "DELETE",
         "path": "/family-tree/person/sourceedit/user/{userId}/tree/{treeId}/source/{sourceId}",
         "kind": "json", "source": "genealogy source-delete devtools HAR 2026-10-06", "side_effect": True,

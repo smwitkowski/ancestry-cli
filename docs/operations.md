@@ -127,12 +127,12 @@ Permanently delete a custom source, and every citation of it, from the tree.
 
 - **Risk:** destructive
 - **Required:** `source_id`
-- **Optional:** -
+- **Optional:** `expect_title`
 - **Undo:** not undoable
-- **Notes:** Citations of the source disappear from every person. person is only the page used for the pre-flight check.
+- **Notes:** expect_title is required unless this tool created the source (the journal knows it); the live delete is refused if the source's title differs. Citations of the source disappear from every person. person is only the page used for the pre-flight check.
 
 ```bash
-ancestry write source-delete --tree TREE --person PERSON --set source_id=380000001 --confirm-tree TREE --live
+ancestry write source-delete --tree TREE --person PERSON --set source_id=380000001 --set expect_title='1900 census, Springfield IL' --confirm-tree TREE --live
 ```
 
 ## citation-add
