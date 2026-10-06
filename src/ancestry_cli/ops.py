@@ -175,12 +175,21 @@ def _person_remove(c, f):
 
 # ---------------------------------------------------------------------------------------------------- sources
 @operation("source-create", summary="Create a custom source in the tree.", risk=ADDITIVE, required=("title",),
-           undo="no delete route is known: listed under `journal list` manual_cleanup",
+           undo="`journal undo` deletes the source with source-delete",
            example="--set title='1900 census, Springfield IL'", notes="Returns ids.gid, the new source id (use it as source_id).",
            success=lambda d: isinstance(d, dict) and isinstance(d.get("gid"), dict))
 def _source_create(c, f):
     _need(f.get("title"))
     return dict(method="POST", path=f"{_PREFIX}/sourceedit/user/{c.actor}/tree/{c.tree_id}/source", body={"title": f["title"]})
+
+
+@operation("source-delete", summary="Permanently delete a custom source, and every citation of it, from the tree.", risk=DESTRUCTIVE,
+           required=("source_id",), undo="not undoable", example="--set source_id=380000001",
+           notes="Citations of the source disappear from every person. person is only the page used for the pre-flight check.",
+           success=lambda d: d == {})
+def _source_delete(c, f):
+    _need(_ID.match(str(f.get("source_id", ""))))
+    return dict(method="DELETE", path=f"{_PREFIX}/sourceedit/user/{c.actor}/tree/{c.tree_id}/source/{f['source_id']}", body=None)
 
 
 @operation("citation-add", summary="Cite an existing source on a person.", risk=ADDITIVE, required=("title", "source_id"),

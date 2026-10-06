@@ -769,6 +769,12 @@ ENDPOINTS = [
         "notes": "Create a custom source. Response {gid:{v:'<sourceId>:n:n'},title,cd,md}; sourceId is the first gid segment.",
     },
     {
+        "group": "writes", "name": "source_delete", "method": "DELETE",
+        "path": "/family-tree/person/sourceedit/user/{userId}/tree/{treeId}/source/{sourceId}",
+        "kind": "json", "source": "genealogy source-delete devtools HAR 2026-10-06", "side_effect": True,
+        "notes": "Delete a custom source and every citation of it (UI: Edit source, Delete this source, confirm). Empty body, 200, {}.",
+    },
+    {
         "group": "writes", "name": "citation_create", "method": "POST",
         "path": "/family-tree/person/sourceedit/user/{userId}/tree/{treeId}/person/{personId}/citation",
         "body": {"sourceId": "123456789", "title": "citation details", "url": ""},

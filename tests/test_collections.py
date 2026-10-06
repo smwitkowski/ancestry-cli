@@ -30,3 +30,11 @@ def test_unknown_profile_is_an_error_not_a_fallback(monkeypatch, tmp_path):
     assert config.unknown_profile() is None
     monkeypatch.delenv("ANCESTRY_CLI_PROFILE")
     assert config.unknown_profile() is None          # no profile named: the flat config is the default
+
+
+def test_source_delete_request_and_undo_of_source_create():
+    from ancestry_cli import journal, ops
+    r = ops.build("source-delete", tree_id=5, person_id=7, source_id="780832148", actor="g")
+    assert r["method"] == "DELETE" and r["path"].endswith("/tree/5/source/780832148") and r["body"] is None
+    inv = journal.inverse("source-create", 5, 7, {"title": "t"}, {"gid": "780832148"})
+    assert inv == {"op": "source-delete", "person_id": 7, "fields": {"source_id": "780832148"}}

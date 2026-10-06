@@ -471,7 +471,7 @@ def test_undo_all_skips_real_tree_entries(tmp_path, monkeypatch):
 def test_every_operation_is_fully_described_and_buildable():
     from ancestry_cli import cli as _cli
     risks = {"additive", "edit", "structural", "destructive", "hint-state"}
-    assert set(tw.OPS) == set(tw.SPECS) and len(tw.OPS) == 22
+    assert set(tw.OPS) == set(tw.SPECS) and len(tw.OPS) == 23
     for name, spec in tw.SPECS.items():
         assert spec.summary and spec.undo and spec.example and spec.risk in risks, name
         assert callable(spec.builder) and callable(spec.success), name

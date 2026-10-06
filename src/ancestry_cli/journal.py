@@ -60,6 +60,8 @@ def inverse(op, tree_id, person_id, fields, ids, snapshot=None):
         return {"op": "tag-remove", "person_id": person_id, "fields": {"tags": ids["addedTags"]}}
     if op == "tag-remove" and ids.get("removedTags"):
         return {"op": "tag-add", "person_id": person_id, "fields": {"tags": ids["removedTags"]}}
+    if op == "source-create" and ids.get("gid"):
+        return {"op": "source-delete", "person_id": person_id, "fields": {"source_id": ids["gid"]}}
     if op == "media-upload" and ids.get("mediaId"):
         return {"op": "media-remove", "person_id": person_id, "fields": {"media_id": ids["mediaId"]}}
     if op == "weblink-add" and ids.get("webLinkId"):

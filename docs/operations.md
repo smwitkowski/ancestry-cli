@@ -21,6 +21,7 @@ Risk classes:
 | [`relative-add`](#relative-add) | structural | `relation`, `status` | Create a new person and link them to this person as a relative. |
 | [`person-remove`](#person-remove) | destructive | - | Permanently delete a person from the tree. |
 | [`source-create`](#source-create) | additive | `title` | Create a custom source in the tree. |
+| [`source-delete`](#source-delete) | destructive | `source_id` | Permanently delete a custom source, and every citation of it, from the tree. |
 | [`citation-add`](#citation-add) | additive | `title`, `source_id` | Cite an existing source on a person. |
 | [`citation-remove`](#citation-remove) | destructive | `citation_id` | Remove a citation from a person. |
 | [`fact-attach-source`](#fact-attach-source) | additive | `--assertion`, `citation_id` | Attach an existing citation to a fact. |
@@ -113,11 +114,25 @@ Create a custom source in the tree.
 - **Risk:** additive
 - **Required:** `title`
 - **Optional:** -
-- **Undo:** no delete route is known: listed under `journal list` manual_cleanup
+- **Undo:** `journal undo` deletes the source with source-delete
 - **Notes:** Returns ids.gid, the new source id (use it as source_id).
 
 ```bash
 ancestry write source-create --tree TREE --person PERSON --set title='1900 census, Springfield IL' --confirm-tree TREE --live
+```
+
+## source-delete
+
+Permanently delete a custom source, and every citation of it, from the tree.
+
+- **Risk:** destructive
+- **Required:** `source_id`
+- **Optional:** -
+- **Undo:** not undoable
+- **Notes:** Citations of the source disappear from every person. person is only the page used for the pre-flight check.
+
+```bash
+ancestry write source-delete --tree TREE --person PERSON --set source_id=380000001 --confirm-tree TREE --live
 ```
 
 ## citation-add
