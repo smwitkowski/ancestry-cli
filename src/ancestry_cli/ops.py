@@ -21,7 +21,7 @@ _PREFIX = "/family-tree/person"
 _ID = re.compile(r"[1-9][0-9]{0,15}\Z")
 _UUID = re.compile(r"[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}\Z")
 _RELATIONS = ("Father", "Mother", "Spouse", "Son", "Daughter", "Brother", "Sister")
-_FACT_KEYS = ("date", "description", "eventType", "gender", "location", "name", "preferred",
+_FACT_KEYS = ("date", "description", "eventType", "gender", "label", "location", "name", "preferred",
               "showMap", "showOnLifeStory", "title")
 
 # risk classes: how much an operation can change.
@@ -103,18 +103,25 @@ def _fact_body(assertion_id, f):
     _need(isinstance(location, (str, dict)))        # add posts a bare string; edit posts {placeName, GPID, showUnderline}
     name = {"givenName": "", "surname": "", "suffix": "", **f.get("name", {})}
     _need(set(name) == {"givenName", "surname", "suffix"})
-    return {"assertionId": str(assertion_id), "date": f.get("date", ""), "description": f.get("description", ""),
+    body = {"assertionId": str(assertion_id), "date": f.get("date", ""), "description": f.get("description", ""),
             "eventType": f["eventType"], "gender": f.get("gender", ""), "location": location, "name": name,
             "preferred": None, "showMap": bool(f.get("showMap", False)),
             "showOnLifeStory": bool(f.get("showOnLifeStory", True)), "title": f.get("title", "")}
+    if str(f["eventType"]).replace(" ", "").lower() == "customevent":      # the site wants its own id spelling and the label
+        _need(isinstance(f.get("label"), str) and f["label"].strip(), "label", "missing")
+        body["eventType"], body["customEventTitle"] = "customevent", f["label"].strip()
+    elif f.get("label"):
+        raise WriteRequestError("invalid-write-request", [{"field": "label", "issue": "not-allowed"}])
+    return body
 
 
-_FACT_FIELDS = ("date", "description", "location", "gender", "title", "name", "showMap", "showOnLifeStory")
+_FACT_FIELDS = ("date", "description", "location", "gender", "title", "name", "showMap", "showOnLifeStory", "label")
 
 
 @operation("fact-add", summary="Add a fact or event (birth, residence, ...) to a person.", risk=ADDITIVE,
            required=("eventType",), optional=_FACT_FIELDS, undo="journal undo removes the fact",
            example="--set eventType=Residence --set date=1900 --set description='Lived on Main St'",
+           notes="eventType CustomEvent needs --set label='the fact label' (the title the site shows); description is optional.",
            success=lambda d: _is(d, status=True))
 def _fact_add(c, f):
     _need("eventType" in f)

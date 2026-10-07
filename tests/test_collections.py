@@ -148,3 +148,16 @@ def test_newspapers_page_parse():
     assert info["title"] == "Daily - Lebanon | Page 2 archive" and info["publisher_extra"] and info["page_gated"]
     assert info["logged_in"] and info["subscriber"] is False and info["more_articles"] == 39
     assert info["articles"][0] == {"article": "aaa", "headline": "Funerals", "names": ["Jo Doe"]}
+
+
+def test_custom_event_body_needs_its_label():
+    import pytest
+    from ancestry_cli import ops
+    b = ops.build("fact-add", tree_id=5, person_id=7, eventType="CustomEvent", label=" Church membership ", description="d", actor="g")["body"]
+    assert b["eventType"] == "customevent" and b["customEventTitle"] == "Church membership" and b["description"] == "d"
+    with pytest.raises(ops.WriteRequestError):
+        ops.build("fact-add", tree_id=5, person_id=7, eventType="CustomEvent", description="d", actor="g")
+    with pytest.raises(ops.WriteRequestError):
+        ops.build("fact-add", tree_id=5, person_id=7, eventType="Residence", label="x", actor="g")
+    from ancestry_cli import sender
+    assert sender._explicitly_rejected(200, {"statusCode": 400}) and not sender._explicitly_rejected(200, {"statusCode": 200})

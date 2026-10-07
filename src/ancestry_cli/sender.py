@@ -296,7 +296,8 @@ def _explicitly_rejected(status, data):
     if isinstance(status, int) and 400 <= status < 500:
         return True
     return isinstance(data, dict) and (data.get("ErrorCode") not in (None, 0) or data.get("success") is False
-                                       or data.get("status") is False)
+                                       or data.get("status") is False
+                                       or (type(data.get("statusCode")) is int and data["statusCode"] >= 400))
 
 
 def _readback(w, fields):

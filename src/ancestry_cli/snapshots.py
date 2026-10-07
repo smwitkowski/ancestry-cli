@@ -87,6 +87,8 @@ def restore_fields(snapshot, assertion_id):
     gender = next((x.get("Value") for x in snapshot["facts"] if x.get("Type") == 44), "") or ""
     out = {"eventType": f["TypeString"], "date": f.get("Date") or "", "description": f.get("Description") or "",
            "gender": gender if isinstance(gender, str) else ""}
+    if f.get("TypeString") == "CustomEvent" and f.get("Title"):
+        out["label"] = f["Title"]                   # a custom event's own label is its Title
     if f.get("Place"):
         out["location"] = {"placeName": f["Place"], "GPID": gpid(f.get("PlaceGpids")), "showUnderline": False}
     return out

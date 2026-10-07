@@ -50,8 +50,9 @@ Add a fact or event (birth, residence, ...) to a person.
 
 - **Risk:** additive
 - **Required:** `eventType`
-- **Optional:** `date`, `description`, `location`, `gender`, `title`, `name`, `showMap`, `showOnLifeStory`
+- **Optional:** `date`, `description`, `location`, `gender`, `title`, `name`, `showMap`, `showOnLifeStory`, `label`
 - **Undo:** journal undo removes the fact
+- **Notes:** eventType CustomEvent needs --set label='the fact label' (the title the site shows); description is optional.
 
 ```bash
 ancestry write fact-add --tree TREE --person PERSON --set eventType=Residence --set date=1900 --set description='Lived on Main St' --confirm-tree TREE --live
@@ -63,7 +64,7 @@ Change a fact. Only the fields you give change; the rest keep their current valu
 
 - **Risk:** edit
 - **Required:** `--assertion`
-- **Optional:** `eventType`, `date`, `description`, `location`, `gender`, `title`, `name`, `showMap`, `showOnLifeStory`
+- **Optional:** `eventType`, `date`, `description`, `location`, `gender`, `title`, `name`, `showMap`, `showOnLifeStory`, `label`
 - **Undo:** journal undo restores the previous values (from the before-snapshot)
 - **Notes:** A person's name is edited as a fact with eventType=Name.
 
