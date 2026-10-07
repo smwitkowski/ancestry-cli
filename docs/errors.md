@@ -65,9 +65,9 @@ Exit codes: `0` ok, `1` failed with nothing changed, `2` bad usage, `3` state un
 | `image-unavailable` | yes | no | The record image could not be fetched (no image URL on the viewer page, or no image rights). Check the collection and image ids from a search result; nothing was changed. | run: `ancestry doctor` |
 | `newspapers-tab-required` | no | yes | Open https://www.newspapers.com in one tab of the Chrome on this port and sign in by hand (Ancestry sign-in works). Leave the Ancestry tab alone. | human: Open Newspapers.com in a tab and sign in.<br>run: `ancestry doctor` *(after-human)* |
 | `newspapers-tab-ambiguous` | no | yes | More than one Newspapers.com tab is open; leave exactly one. | human: Close the extra Newspapers.com tabs. |
-| `newspapers-check-required` | no | yes | Newspapers.com is showing its bot check. Pass it by hand in that tab, then retry. | human: Pass the Newspapers.com check in its tab. |
+| `newspapers-check-required` | no | no | This archive is behind a bot check that plain HTTP cannot pass, and the tool does not try to. Use that site in your own browser. |  |
 | `newspapers-sign-in-required` | no | yes | The Newspapers.com tab is not signed in. Sign in by hand (Ancestry sign-in works), then retry. | human: Sign in to Newspapers.com in its tab. |
-| `newspapers-unavailable` | yes | no | Newspapers.com did not return the page (see status). Check the page id. | edit-args: Check the page id. |
+| `newspapers-unavailable` | yes | no | The archive did not answer (see status). Retry once later. | retry: retry the same command |
 | `familysearch-chrome-not-running` | no | yes | No Chrome is listening for FamilySearch (default port 9223, set FAMILYSEARCH_CLI_PORT). Start one with --remote-debugging-port and sign in to familysearch.org by hand. | human: Start the FamilySearch Chrome and sign in.<br>run: `familysearch doctor` *(after-human)* |
 | `familysearch-tab-required` | no | yes | The FamilySearch Chrome needs exactly one tab, on www.familysearch.org. This tool never opens or navigates tabs. | human: Put one tab on www.familysearch.org.<br>run: `familysearch doctor` *(after-human)* |
 | `familysearch-tab-ambiguous` | no | yes | More than one tab is on www.familysearch.org; leave exactly one. | human: Close the extra FamilySearch tabs. |
@@ -77,6 +77,8 @@ Exit codes: `0` ok, `1` failed with nothing changed, `2` bad usage, `3` state un
 | `familysearch-not-found` | no | no | FamilySearch has nothing at that identifier (or you may not see it). Check the ARK, PID, film or image number. | edit-args: Check the identifier. |
 | `familysearch-unavailable` | yes | no | FamilySearch did not return the data (see status). Retry once; if it repeats run `familysearch doctor`. | retry: retry the same command<br>run: `familysearch doctor` |
 | `familysearch-no-image-link` | no | no | FamilySearch links no image to this record. If it names a digital_film, the original is on that film: use `familysearch film DGS` and look for the record's image number by browsing, or search the film's images with `familysearch image --film DGS --image N`. | edit-args: Use --film and --image, or --das, instead. |
+| `newspapers-rate-limited` | yes | no | The archive is rate-limiting. Wait a minute or two, then retry. | retry: retry the same command |
+| `newspapers-not-found` | no | no | The archive has no such page. Check the id (provider:lccn/YYYY-MM-DD/ed-N/seq-N). | edit-args: Check the id. |
 | `familysearch-image-restricted` | no | no | This image is not viewable with this account (see permission). Nothing was saved. |  |
 | `invalid-request` | no | no | A value is invalid; see problems for the field. | edit-args: Fix the listed fields. |
 | `fact-not-found` | no | no | That assertion id is not on this person. Use `ancestry person` to list fact ids. | run: `ancestry person --tree {tree_id} --person {person_id}` |

@@ -69,6 +69,10 @@ see what can be written. Every command prints one JSON object; follow `state` an
 | [docs/error-roadmap.md](docs/error-roadmap.md) | how errors are designed for agents, and what was built |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | adding an operation, running tests |
 
+## Free newspaper archives (read-only)
+
+`newspapers` searches Chronicling America and the Pennsylvania Newspaper Archive over plain HTTP. See [docs/newspapers.md](docs/newspapers.md).
+
 ## FamilySearch (read-only)
 
 The package also installs `familysearch`, which reads FamilySearch records, tree persons, film catalog entries and record images through a
