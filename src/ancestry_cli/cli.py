@@ -142,6 +142,13 @@ def build_parser():
     p.add_argument("action", choices=("page",))
     p.add_argument("--page", dest="page_id", help="Newspapers.com page id (from the Ancestry record's View image link)")
 
+    p = subs.add_parser("census", help="everyone indexed on one record image (a census page), grouped by household", allow_abbrev=False)
+    p.add_argument("--collection", type=int, required=True)
+    p.add_argument("--image", dest="image_id", help="image id (from a search result's imageIds)")
+    p.add_argument("--record", dest="record_id", type=int, help="a record id on the page: finds its image and marks it")
+    p.add_argument("--surname", help="keep only households with someone whose name has all these words")
+    p.add_argument("--out", help="also write every person and column to this new CSV file")
+
     p = subs.add_parser("sources", help="list or find the tree's custom sources by title (reuse before creating)", allow_abbrev=False)
     _tree_arg(p)
     p.add_argument("--person", dest="person_id", type=int, help="optional if the account is pinned (`whoami --pin`)")
@@ -238,6 +245,9 @@ def _run(command, args):
     if command == "init":
         from .setup import init
         return init()
+    if command == "census":
+        from .census import census
+        return census(**args)
     if command == "newspapers":
         from .newspapers import page as newspapers_page
         return newspapers_page(page_id=args["page_id"])

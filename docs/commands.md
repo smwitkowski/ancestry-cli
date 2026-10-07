@@ -78,6 +78,13 @@ validated and nothing is sent. With `--live` the first step is the canary: if it
 Later steps stop at the first failure or unknown outcome (exit 3: do not retry; `journal verify`). Each result (ok, state,
 journal_id, ids, readback) is appended to the manifest's `receipt`; re-running skips steps already recorded as ok.
 
+### `ancestry census --collection C (--record R | --image I) [--surname S] [--out FILE.csv]`
+Everyone indexed on one record image (a census page), grouped by household, with every column the collection has (relation to head,
+age, birthplace, occupation, and so on, labelled). With `--record` the page is found from the record and that person is marked
+`target`. `--surname` keeps only households that contain someone with those words in their name (the "filter the page by surname"
+trick). `--out` writes every person and column to a new CSV. Neighbors are the households before and after yours on the page; a
+household at the page edge continues on the adjacent image (not fetched).
+
 ### `ancestry collections find|describe|list`
 Record collections. Ancestry publishes no full list, so this has three parts:
 - `find [--given G] --surname S [--birth Y] [--location L] [--keyword WORD] [--category C]`: collections with hits for a person

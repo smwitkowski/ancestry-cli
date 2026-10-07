@@ -10,6 +10,7 @@ Reads only: FamilySearch tree writes are out of scope.
   familysearch record ARK            (1:1:XXXX-XXX or the 61903/1:1:... form)
   familysearch person PID [--sources]
   familysearch film DGS              (catalog entry and image count of a digital film)
+  familysearch page (--ark 3:1:X | --film DGS --image N)   (every indexed record on one image)
   familysearch fulltext --q TEXT [--place P] [--from Y] [--to Y] [--type deed|will|probate|...] [--collection C] [--limit N] [--offset N] [--full]
   familysearch catalog --place P [--subject-id ID] [--years A-B] [--films] [--exact]   (what the catalog holds for a place)
   familysearch locate --film DGS [--type baptisms|marriages|burials|births|deaths] (--date YYYY[-MM[-DD]] | --years A-B) [--name N] [--probes K]
@@ -538,6 +539,35 @@ def image(*, out, film_dgs=None, number=None, ark=None, das=None, crop=None, max
     return _guard(run)
 
 
+# ------------------------------------------------------------------------------------------------ everything indexed on one image
+def page_records(*, ark=None, film_dgs=None, number=None):
+    """Every indexed record on one image (names, roles, events): a census page's household neighbors, a register page's entries."""
+    if ark and not _IMG_ARK.match(ark) or film_dgs and not _DGS.match(str(film_dgs)) or not (ark or (film_dgs and number)):
+        return failure("invalid-request", problems=[{"field": "ark", "issue": "invalid", "expected": "3:1:XXXX, or --film with --image"}])
+
+    def run():
+        image_ark = _IMG_ARK.match(ark).group(1) if ark else None
+        if not image_ark:
+            _, arks = _film_data(film_dgs)
+            if not 1 <= int(number) <= len(arks):
+                raise LaneError("familysearch-not-found", status=404)
+            image_ark = arks[int(number) - 1]
+        body = {"type": "image-data", "args": {"imageURL": f"https://sg30p0.familysearch.org/service/records/storage/deepzoomcloud/dz/v1/{image_ark}/image.xml",
+                                              "locale": "en", "state": {"imageOrFilmUrl": "", "selectedImageIndex": -1, "viewMode": "i"}}}
+        row, = fetch([{"method": "POST", "path": "/search/filmdatainfo/image-data", "accept": "application/json", "body": body}])
+        data = _json(row)
+        records = []
+        for rec in data.get("records") or []:
+            people = [_person(p) for p in rec.get("persons", [])]
+            main = next((p for p in people if p["principal"]), people[0] if people else {})
+            ark_ = next((m.group(0) for p in rec.get("persons", []) for i in (p.get("identifiers") or {}).get("http://gedcomx.org/Persistent", [])
+                         for m in [re.search(r"1:1:[A-Z0-9-]+", i)] if m), None)
+            records.append({"ark": main.get("ark") or ark_, "principal": main, "others": [{k: p[k] for k in ("name", "role")} for p in people if p is not main][:12]})
+        return {"ok": True, "classification": "familysearch-page", "dispatch_attempted": True, "state": "unchanged", "image_ark": image_ark,
+                "dgs": data.get("dgsNum"), "records": len(records), "indexed": records}
+    return _guard(run)
+
+
 # ------------------------------------------------------------------------------------------------ full-text search
 def _excerpts(text, words, context=160, limit=3):
     low, spans = text.lower(), []
@@ -905,6 +935,10 @@ def build_parser():
     w.add_argument("--waypoint", help="a waypoint id from the previous call, like 9B7J-YWL:1031034401,1031034402")
     w.add_argument("--query", help="words that must appear in a child's title")
     w.add_argument("--limit", type=int, default=60)
+    pg = subs.add_parser("page", help="every indexed record on one image (census page neighbors, register entries)")
+    pg.add_argument("--ark", help="image ARK 3:1:XXXX")
+    pg.add_argument("--film", dest="film_dgs")
+    pg.add_argument("--image", dest="number", type=int)
     ft = subs.add_parser("fulltext", help="full-text search of handwritten deeds, wills, probate and court records")
     ft.add_argument("--q", required=True, help="words, as OCR may spell them")
     ft.add_argument("--place", help="e.g. \"Queen Anne's County, Maryland\"")
@@ -964,6 +998,8 @@ def main(argv=None):
         result = locate(film_dgs=args["film_dgs"], type_=args["type_"], date=args["date"], years=args["years"], name=args["name"], probes=args["probes"])
     elif command == "waypoints":
         result = waypoints(collection=args["collection"], waypoint=args["waypoint"], query=args["query"], limit=args["limit"])
+    elif command == "page":
+        result = page_records(ark=args["ark"], film_dgs=args["film_dgs"], number=args["number"])
     elif command == "fulltext":
         result = fulltext(q=args["q"], place=args["place"], frm=args["frm"], to=args["to"], type_=args["type_"], collection=args["collection"],
                           limit=args["limit"], offset=args["offset"], full=args["full"])

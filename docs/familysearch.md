@@ -19,6 +19,7 @@ If FamilySearch shows a bot check, the command stops with `familysearch-check-re
 | `familysearch record ARK` | one record: collection, citation, fields (film numbers, record number), persons with facts and roles, relationships |
 | `familysearch person PID [--sources]` | a family-tree person: facts, parents, spouses and children with PIDs, attached sources |
 | `familysearch film DGS` | catalog entry of a digital film: title, dates, place, image count, the films' contents |
+| `familysearch page (--ark 3:1:X \| --film DGS --image N)` | every indexed record on one image: names, roles, events, record ARKs (a census page's neighbors, a register page's entries) |
 | `familysearch fulltext --q TEXT [--place P] [--from Y] [--to Y] [--type deed\|will\|probate] [--collection C] [--limit N] [--offset N] [--full]` | full-text search of the machine-read handwriting of deeds, wills, probate and court records |
 | `familysearch catalog --place P [--subject-id ID] [--years A-B] [--films] [--exact] [--limit N]` | the catalog by place: record types, then titles, then films with DGS numbers |
 | `familysearch locate --film DGS [--type baptisms\|marriages\|burials\|births\|deaths] (--date YYYY[-MM[-DD]] \| --years A-B) [--name N] [--probes K]` | which images of a film to look at for a date, by sampling the film's indexed records |

@@ -161,3 +161,12 @@ def test_custom_event_body_needs_its_label():
         ops.build("fact-add", tree_id=5, person_id=7, eventType="Residence", label="x", actor="g")
     from ancestry_cli import sender
     assert sender._explicitly_rejected(200, {"statusCode": 400}) and not sender._explicitly_rejected(200, {"statusCode": 200})
+
+
+def test_census_rows_group_and_label_columns():
+    from ancestry_cli import census
+    panel = {"fieldLabels": [{"fieldName": "SelfRelationToHead", "labelText": "Relation to Head"}, {"fieldName": "SelfResidenceAge", "labelText": "Age"}],
+             "records": [{"pid": 1, "householdId": "h1", "fullName": "A B", "recordFields": [{"fieldName": "SelfRelationToHead", "value": "Head"},
+                                                                                          {"fieldName": "SelfResidenceAge", "value": "40", "correctedValue": "41"}]}]}
+    rows, labels = census._rows(panel)
+    assert labels == ["Relation to Head", "Age"] and rows[0]["fields"] == {"Relation to Head": "Head", "Age": "41"} and rows[0]["household_id"] == "h1"
