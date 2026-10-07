@@ -790,6 +790,13 @@ ENDPOINTS = [
         "kind": "json", "source": "ui probe 2026-10-06",
     },
     {
+        "group": "merge", "name": "person_hint_review", "method": "GET",
+        "path": "/api/hintsui-api/person/{personGid}/review/{sourceGid}",
+        "query": {"fullRecords": {"sample": "true"}, "includePersonsCount": {"sample": "false"}, "evalV": {"sample": "1.0.0-455994a"}},
+        "kind": "json", "source": "ui probe 2026-10-07", "side_effect": False,
+        "notes": "The 'Review' view of a potential parent: the suggested person's facts and sources, from another member's tree.",
+    },
+    {
         "group": "people", "name": "source_get", "method": "GET",
         "path": "/family-tree/person/sourceedit/user/{userId}/tree/{treeId}/source/{sourceId}",
         "kind": "json", "source": "probe 2026-10-06",

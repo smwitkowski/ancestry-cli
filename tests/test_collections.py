@@ -170,3 +170,18 @@ def test_census_rows_group_and_label_columns():
                                                                                           {"fieldName": "SelfResidenceAge", "value": "40", "correctedValue": "41"}]}]}
     rows, labels = census._rows(panel)
     assert labels == ["Relation to Head", "Age"] and rows[0]["fields"] == {"Relation to Head": "Head", "Age": "41"} and rows[0]["household_id"] == "h1"
+
+
+def test_potential_parent_review_projection():
+    from ancestry_cli import hints
+    review = {"Info": {"Name": "Michael Ryan", "Gender": "m", "Birth": {"Date": "1813", "Location": "Thurles"}, "Death": {"Date": "1860", "Location": "Ontario"}},
+              "Records": [{"Title": "Parish Registers", "Gid": "151:61039:1777061", "ImageId": "x", "Fields": [{"Label": "Name", "Value": "Michl Ryan"}]}],
+              "Family": {"a": {"IsPrimaryNode": True, "Name": {"Record": {"Given": "Michael", "Surname": "Ryan"}},
+                               "Family": {"Father": "f", "Mother": None, "Siblings": [], "FamilyUnits": [{"Wife": "w", "Children": ["c"]}]}},
+                         "f": {"Name": {"Record": {"Given": "John", "Surname": "Ryan"}}}, "w": {"Name": {"Record": {"Given": "Ellen"}}},
+                         "c": {"Name": {"Record": {"Given": "Pat", "Surname": "Ryan"}}}}}
+    out = hints.parse_review(review, "father", {"HintId": "9", "SourceGid": "5:1030:77"})
+    assert out["name"] == "Michael Ryan" and out["source_tree_id"] == "77" and out["records"][0]["collection_id"] == "61039"
+    assert out["source_tree_family"] == {"parents": ["John Ryan"], "spouses": ["Ellen"], "children": ["Pat Ryan"], "siblings": []}
+    living = hints.parse_review({"Info": {"Name": "Jo Doe", "Birth": {"Date": "1990"}}}, "mother", {"HintId": "1", "SourceGid": "1:1030:2"})
+    assert living["possibly_living"] and living["name"] is None

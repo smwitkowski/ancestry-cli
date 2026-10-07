@@ -100,6 +100,13 @@ Facts in `ancestry person` carry `citation_ids`, and each entry of `citations` c
 ### `ancestry find ... --complete`
 Uses the tree's own "Find in tree" search and reads every page, so an empty result means the name is not in the tree (plain `find` uses the person picker, which may miss people). Same fields and living-person redaction as `find`.
 
+### `ancestry hint parents --tree T --person P [--include-living]`
+The "Potential father / Potential mother" suggestions Ancestry shows at the top of a line. For each: role, `hint_id`, the source
+member tree and person, name, gender, birth and death (date, place), the records behind the suggestion (title, record and collection ids,
+first fields, whether an image exists) and the family in that other tree (parents, spouses, children, siblings by name). These are leads
+from another member's tree, never proof. A suggestion who may be living is redacted unless `--include-living`.
+Accepting a suggested parent is not built yet: it needs a capture of the accept request on a sandbox tree.
+
 ### `ancestry read hints --tree T --person P`, `ancestry read record --collection C --record R`
 Hints page data and a record's details. **Take record and collection ids from a live search result**, not from examples.
 ### `ancestry read list [GROUP]` / `ancestry read get NAME [--tree T --person P --path k=v --param k=v] [--full]`

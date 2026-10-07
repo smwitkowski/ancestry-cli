@@ -81,6 +81,69 @@ class _Accept:
         return f"{_BASE}/api/hintsui-api/trees/{self.tree_id}/merge/job"
 
 
+def _node_name(node):
+    n = ((node or {}).get("Name") or {}).get("Record") or {}
+    return " ".join(x for x in (n.get("Given"), n.get("Surname"), n.get("Suffix")) if x) or None
+
+
+def _year(text):
+    m = re.search(r"\b(\d{4})\b", str(text or ""))
+    return int(m.group(1)) if m else None
+
+
+def parse_review(review, role, hint, include_living=False):
+    """One suggested parent, from the hint's review view: facts, the records behind it and the family in the source tree."""
+    info = review.get("Info") or {}
+    birth, death = info.get("Birth") or {}, info.get("Death") or {}
+    by, dy = _year(birth.get("Date")), _year(death.get("Date"))
+    living = bool(by and by > time.gmtime().tm_year - 100 and not dy)
+    hide = living and not include_living
+    nodes = review.get("Family") or {}
+    primary = next((n for n in nodes.values() if n.get("IsPrimaryNode")), {})
+    fam = primary.get("Family") or {}
+    names = lambda ids: [nm for nm in (_node_name(nodes.get(i)) for i in ids if i) if nm]
+    kids = [c for u in fam.get("FamilyUnits") or [] for c in u.get("Children") or []]
+    spouses = [x for u in fam.get("FamilyUnits") or [] for x in (u.get("Wife"), u.get("Husband")) if x]
+    records = []
+    for r in review.get("Records") or []:
+        gid = str(r.get("Gid") or "").split(":")
+        records.append({"title": r.get("Title"), "record_id": gid[0] if gid else None, "collection_id": gid[1] if len(gid) > 1 else None,
+                        "has_image": bool(r.get("ImageId")), "fields": {f.get("Label"): f.get("Value") for f in (r.get("Fields") or [])[:8]}})
+    src = str(hint.get("SourceGid") or "").split(":")
+    return {"role": role, "hint_id": str(hint.get("HintId")), "source_person_id": src[0] or None,
+            "source_tree_id": src[2] if len(src) > 2 else None, "possibly_living": living,
+            "name": None if hide else info.get("Name"), "gender": info.get("Gender"),
+            "birth": None if hide else {"date": birth.get("Date"), "place": birth.get("Location")},
+            "death": None if hide else {"date": death.get("Date"), "place": death.get("Location")},
+            "records": [] if hide else records,
+            "source_tree_family": None if hide else {"parents": names([fam.get("Father"), fam.get("Mother")]), "spouses": names(spouses),
+                                                      "children": names(kids), "siblings": names(fam.get("Siblings") or [])},
+            "note": "A suggestion from another member's tree: a lead, never proof. Read the records behind it."}
+
+
+def _parents(inner, tree_id, person_id, evalv, include_living):
+    from .snapshots import person_data
+    page = inner.get(f"{_BASE}/family-tree/person/tree/{tree_id}/person/{person_id}/facts", timeout=60, allow_redirects=False, writes_ok=False)
+    code = classify_preflight(getattr(page, "status_code", None), page.text)
+    if code:
+        raise LaneError(code)
+    pr = person_data(page.text)["person"]["PersonResearch"]
+    raw = pr.get("NewPersonHints") or (pr.get("NewPersonHintsData") or {}).get("hints") or []
+    out = []
+    for hint in raw:
+        role = str(hint.get("Role") or "").lower()
+        if role not in ("father", "mother"):
+            continue
+        review = inner.get(f"{_BASE}/api/hintsui-api/person/{person_id}:1030:{tree_id}/review/{hint.get('SourceGid')}",
+                           params={"fullRecords": "true", "includePersonsCount": "false", "evalV": evalv},
+                           headers=_headers(tree_id, person_id), timeout=60, allow_redirects=False, writes_ok=False)
+        if not 200 <= getattr(review, "status_code", 0) < 300:
+            out.append({"role": role, "hint_id": str(hint.get("HintId")), "review": "unavailable", "status": review.status_code})
+            continue
+        out.append(parse_review(json.loads(review.text), role, hint, include_living))
+    return out
+
+
 def _person_hints(inner, tree_id, person_id):
     """Fetch and parse the person's hints page; returns (hints, raw response data). Raises LaneError on a bad page."""
     page = inner.get(f"{_BASE}/hintsui-personhints/api/PersonHintsList",
@@ -165,7 +228,7 @@ def _guards(tree_id, person_id, hint_id, cite_only, confirm_tree, force):
 
 
 def command(*, action, tree_id, person_id, hint_id=None, cite_only=False, dry_run=True, bridge=None, poll_seconds=30,
-            confirm_tree=None, force=False):
+            confirm_tree=None, force=False, include_living=False):
     """`list` shows the person's hints; `accept` accepts one (dry-run unless dry_run=False)."""
     if type(tree_id) is not int or type(person_id) is not int or not config.tree_allowed(tree_id):
         return failure("configuration-error")
@@ -186,6 +249,14 @@ def command(*, action, tree_id, person_id, hint_id=None, cite_only=False, dry_ru
             hints, data = _person_hints(inner, tree_id, person_id)
             if action == "list":
                 return {"ok": True, "classification": "hints", "hints": hints}
+            if action == "parents":
+                evalv = _EVAL.search(json.dumps(data))
+                if not evalv:
+                    return failure("eval-version-unresolved")
+                found = _parents(inner, tree_id, person_id, evalv.group(1), include_living)
+                return {"ok": True, "classification": "potential-parents", "dispatch_attempted": True, "state": "unchanged",
+                        "tree_id": str(tree_id), "person_id": str(person_id), "count": len(found), "suggestions": found,
+                        "note": "Accepting a suggested parent is not built: no capture of the accept request exists yet."}
             chosen = next((h for h in hints if h["hint_id"] == hint_id), None)
             if not chosen or not chosen["record_id"]:
                 return failure("hint-not-found-or-not-a-record")

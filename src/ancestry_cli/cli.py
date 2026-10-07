@@ -159,10 +159,11 @@ def build_parser():
     p.add_argument("--live", action="store_true", help="send for real (default: validate only)")
 
     p = subs.add_parser("hint", help="list a person's hints or accept one", allow_abbrev=False)
-    p.add_argument("action", choices=("list", "accept"))
+    p.add_argument("action", choices=("list", "accept", "parents"))
     _tree_arg(p, True)
     p.add_argument("--person", dest="person_id", required=True, type=int)
     p.add_argument("--hint-id")
+    p.add_argument("--include-living", action="store_true", help="parents: do not redact a suggestion who may be living")
     p.add_argument("--cite-only", action="store_true")
     p.add_argument("--confirm-tree", dest="confirm_tree", type=_tree)
     p.add_argument("--force", action="store_true")
