@@ -10,6 +10,7 @@ Reads only: FamilySearch tree writes are out of scope.
   familysearch record ARK            (1:1:XXXX-XXX or the 61903/1:1:... form)
   familysearch person PID [--sources]
   familysearch film DGS              (catalog entry and image count of a digital film)
+  familysearch fulltext --q TEXT [--place P] [--from Y] [--to Y] [--type deed|will|probate|...] [--collection C] [--limit N] [--offset N] [--full]
   familysearch catalog --place P [--subject-id ID] [--years A-B] [--films] [--exact]   (what the catalog holds for a place)
   familysearch locate --film DGS [--type baptisms|marriages|burials|births|deaths] (--date YYYY[-MM[-DD]] | --years A-B) [--name N] [--probes K]
   familysearch film DGS --sheet --from N --to M --step K --out FILE   (contact sheet)
@@ -48,6 +49,7 @@ _ALLOWED = [
     re.compile(r"/ark:/61903/1:1:[A-Z0-9-]{1,80}\?useSLS=true&useRolesOverride=false\Z"),
     re.compile(r"/service/search/hr/v2/personas\?[^#\s]{1,3000}\Z"),
     re.compile(r"/platform/users/current\Z"),
+    re.compile(r"/service/search/fulltext/search\?[A-Za-z0-9.%+=&_,'-]{1,800}\Z"),
     re.compile(r"/service/search/catalog/v3/search\?[A-Za-z0-9.%+=&_-]{1,600}\Z"),
     re.compile(r"/service/search/catalog/item/[a-z]{2,8}:[0-9]{1,12}\Z"),
     re.compile(r"/platform/tree/persons/[A-Z0-9-]{1,12}(?:/(?:parents|spouses|children|sources))?\Z"),
@@ -438,7 +440,7 @@ def catalog(*, place, subject_id=None, years=None, limit=10, films=False, exact=
 # ------------------------------------------------------------------------------------------------ images
 def _viewable(permission):
     """The permission endpoint answers with a colon list such as `A:ThemisPrmAnyone:B`; `Anyone` in it means any signed-in user may view."""
-    return bool(set(permission.split(":")) & {"ThemisPrmAnyone", "ThemisPrmSignedInUser", "ThemisPrmMember"})
+    return bool(set(permission.split(":")) & {"ThemisPrmAnyone", "ThemisPrmSignedInUser", "ThemisPrmMember", "ThemisPrmRegisteredPatron"})
 
 
 def _levels(width, height):
@@ -500,16 +502,7 @@ def image(*, out, film_dgs=None, number=None, ark=None, das=None, crop=None, max
             if not 1 <= int(number) <= len(images):
                 raise LaneError("familysearch-not-found", status=404)
             image_ark = re.search(r"3:1:[A-Z0-9-]+", images[int(number) - 1]).group(0)
-        das_id = das
-        if not das_id:
-            body = {"type": "image-data", "args": {"imageURL": f"https://sg30p0.familysearch.org/service/records/storage/deepzoomcloud/dz/v1/{image_ark}/image.xml",
-                                                  "locale": "en", "state": {"imageOrFilmUrl": "", "selectedImageIndex": -1, "viewMode": "i"}}}
-            row, = fetch([{"method": "POST", "path": "/search/filmdatainfo/image-data", "accept": "application/json", "body": body}])
-            href = (((_json(row).get("meta") or {}).get("links") or {}).get("image-deepzoom") or {}).get("href", "")
-            m = re.search(r"/(TH-[0-9A-Za-z-]+)/image\.xml", href)
-            if not m:
-                raise LaneError("familysearch-not-found", status=404)
-            das_id = m.group(1)
+        das_id = das or image_ark          # tiles and permission answer to the image ARK as well as to the TH- id
         d = f"/service/records/storage/deepzoomcloud/dz/v1/{das_id}"
         perm, meta = fetch([{"method": "GET", "path": f"/service/records/storage/dascloud/das/v2/{das_id}/permission", "accept": "text/plain"},
                             {"method": "GET", "path": f"{d}/image.xml", "accept": "application/xml"}])
@@ -543,6 +536,83 @@ def image(*, out, film_dgs=None, number=None, ark=None, das=None, crop=None, max
                 "das": das_id, "full_size": [width, height], "zoom_level": level, "reduction": scale, "saved_size": list(canvas.size),
                 "tiles": len(coords), "note": "saved_size is at the zoom level used; raise --max-tiles for more detail or crop tighter."}
     return _guard(run)
+
+
+# ------------------------------------------------------------------------------------------------ full-text search
+def _excerpts(text, words, context=160, limit=3):
+    low, spans = text.lower(), []
+    for w in words:
+        for m in re.finditer(re.escape(w.lower()), low):
+            spans.append((max(0, m.start() - context), min(len(text), m.end() + context)))
+    spans.sort()
+    merged = []
+    for a, b in spans:
+        if merged and a <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(b, merged[-1][1]))
+        else:
+            merged.append((a, b))
+    return [re.sub(r"\s+", " ", text[a:b]).strip() for a, b in merged[:limit]]
+
+
+def fulltext(*, q, place=None, frm=None, to=None, type_=None, collection=None, limit=10, offset=0, full=False):
+    """Search the machine-read handwriting of deeds, wills, probate and court records. Results are images (3:1: ARKs)."""
+    if not q or not re.fullmatch(r"[^\x00-\x1f]{1,200}", q):
+        return failure("invalid-request", problems=[{"field": "q", "issue": "invalid"}])
+    params = {"q.text": q, "count": str(max(1, min(int(limit), 50))), "offset": str(max(0, int(offset))), "m.defaultFacets": "on",
+              "m.queryRequireDefault": "on"}
+    if place:
+        params["q.place"] = place
+    if frm or to:
+        params["q.recordYear.from"], params["q.recordYear.to"] = str(int(frm or 1400)), str(int(to or 2100))
+    if collection:
+        params["c.collectionId"], params["f.collectionId"] = "on", str(int(collection))
+    query = urllib.parse.urlencode(params, quote_via=urllib.parse.quote)
+    if not re.fullmatch(r"[A-Za-z0-9.%+=&_,'-]{1,800}", query):
+        return failure("invalid-request", problems=[{"field": "q", "issue": "invalid"}])
+    words = [w for w in re.findall(r"[\w']+", q) if len(w) > 1]
+
+    def run():
+        hits, data, scanned, start = [], {}, 0, int(offset)
+        for _ in range(4 if type_ else 1):                 # a type filter is applied here, so scan a few pages to fill the limit
+            page_q = query if not type_ else urllib.parse.urlencode({**params, "count": "50", "offset": str(start)}, quote_via=urllib.parse.quote)
+            row, = fetch([{"method": "GET", "path": "/service/search/fulltext/search?" + page_q, "accept": "application/json"}])
+            data = _json(row)
+            entries = data.get("entries", [])
+            scanned += len(entries)
+            start += len(entries)
+            hits += _collect(entries, type_, words, full)
+            if len(hits) >= int(limit) or len(entries) < 50:
+                break
+        seen_arks = set()
+        hits = [h for h in hits if not (h["ark"] in seen_arks or seen_arks.add(h["ark"]))][:int(limit)]
+        return _fulltext_result(q, data, offset, hits, type_, scanned)
+    return _guard(run)
+
+
+def _collect(entries, type_, words, full):
+    hits = []
+    if True:
+        for e in entries:
+            c = e.get("content") or {}
+            kind = c.get("recordType") or ""
+            if type_ and type_.lower() not in (kind + " " + str(c.get("title"))).lower():
+                continue
+            text = c.get("textDocument") or ""
+            hit = {"ark": e.get("id"), "collection_id": e.get("collectionId"), "collection": e.get("collectionTitle"), "record_type": kind or None,
+                   "place": c.get("recordPlace"), "date": c.get("recordDate") or None, "chars": len(text),
+                   "excerpts": _excerpts(text, words), "image_command": f"familysearch image --ark {e.get('id')} --out page.jpg"}
+            if full:
+                hit["text"] = text
+            hits.append(hit)
+    return hits
+
+
+def _fulltext_result(q, data, offset, hits, type_, scanned):
+    return {"ok": True, "classification": "familysearch-fulltext", "dispatch_attempted": True, "state": "unchanged", "query": q,
+            "total": data.get("results"), "offset": int(offset), "scanned": scanned, "returned": len(hits),
+            "note": "Hits are images; the ARK works with `familysearch image --ark`. OCR of handwriting is rough: try spelling variants."
+                    + (" --type was applied to the pages scanned, not to the whole result set." if type_ else ""),
+            "hits": hits}
 
 
 # ------------------------------------------------------------------------------------------------ browsing a film
@@ -835,6 +905,16 @@ def build_parser():
     w.add_argument("--waypoint", help="a waypoint id from the previous call, like 9B7J-YWL:1031034401,1031034402")
     w.add_argument("--query", help="words that must appear in a child's title")
     w.add_argument("--limit", type=int, default=60)
+    ft = subs.add_parser("fulltext", help="full-text search of handwritten deeds, wills, probate and court records")
+    ft.add_argument("--q", required=True, help="words, as OCR may spell them")
+    ft.add_argument("--place", help="e.g. \"Queen Anne's County, Maryland\"")
+    ft.add_argument("--from", dest="frm", type=int, help="record year, from")
+    ft.add_argument("--to", type=int, help="record year, to")
+    ft.add_argument("--type", dest="type_", help="keep hits whose record type contains this (deed, will, probate, court...); applies to the page returned")
+    ft.add_argument("--collection", type=int, help="a collection id from an earlier result")
+    ft.add_argument("--limit", type=int, default=10)
+    ft.add_argument("--offset", type=int, default=0)
+    ft.add_argument("--full", action="store_true", help="include each hit's whole page text")
     c = subs.add_parser("catalog", help="catalog by place: record types, then titles, then films with DGS numbers")
     c.add_argument("--place", required=True, help="place name as the catalog writes it, e.g. 'Germany, Bayern, Rockenhausen'")
     c.add_argument("--subject-id", help="a subject id from the first call (a record type such as Church records)")
@@ -884,6 +964,9 @@ def main(argv=None):
         result = locate(film_dgs=args["film_dgs"], type_=args["type_"], date=args["date"], years=args["years"], name=args["name"], probes=args["probes"])
     elif command == "waypoints":
         result = waypoints(collection=args["collection"], waypoint=args["waypoint"], query=args["query"], limit=args["limit"])
+    elif command == "fulltext":
+        result = fulltext(q=args["q"], place=args["place"], frm=args["frm"], to=args["to"], type_=args["type_"], collection=args["collection"],
+                          limit=args["limit"], offset=args["offset"], full=args["full"])
     elif command == "catalog":
         result = catalog(place=args["place"], subject_id=args["subject_id"], years=args["years"], limit=args["limit"], films=args["films"],
                          exact=args["exact"])

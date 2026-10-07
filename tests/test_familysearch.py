@@ -101,3 +101,13 @@ def test_locate_bisects_to_the_bracket(monkeypatch):
     out = fs.locate(film_dgs="5", type_="baptisms", date="1842-03-05", probes=16)
     c = out["candidates"][0]
     assert c["from"] <= 265 <= c["to"] and c["to"] - c["from"] <= 40 and out["probes"] <= 16
+
+
+def test_fulltext_excerpts_and_inputs():
+    text = "x " * 200 + "Know all men that William Ringgold of Queen Annes" + " y" * 200
+    ex = fs._excerpts(text, ["Ringgold", "Queen"], context=30)
+    assert len(ex) == 1 and "Ringgold" in ex[0] and "Queen" in ex[0]
+    assert fs._excerpts("nothing here", ["Ringgold"]) == []
+    assert fs.fulltext(q="")["classification"] == "invalid-request"
+    fs._check({"path": "/service/search/fulltext/search?q.text=Ringgold&q.place=Queen%20Anne%27s%20County%2C%20Maryland&count=5&offset=0"})
+    assert fs._viewable("ThemisPrmRegisteredPatron")

@@ -19,6 +19,7 @@ If FamilySearch shows a bot check, the command stops with `familysearch-check-re
 | `familysearch record ARK` | one record: collection, citation, fields (film numbers, record number), persons with facts and roles, relationships |
 | `familysearch person PID [--sources]` | a family-tree person: facts, parents, spouses and children with PIDs, attached sources |
 | `familysearch film DGS` | catalog entry of a digital film: title, dates, place, image count, the films' contents |
+| `familysearch fulltext --q TEXT [--place P] [--from Y] [--to Y] [--type deed\|will\|probate] [--collection C] [--limit N] [--offset N] [--full]` | full-text search of the machine-read handwriting of deeds, wills, probate and court records |
 | `familysearch catalog --place P [--subject-id ID] [--years A-B] [--films] [--exact] [--limit N]` | the catalog by place: record types, then titles, then films with DGS numbers |
 | `familysearch locate --film DGS [--type baptisms\|marriages\|burials\|births\|deaths] (--date YYYY[-MM[-DD]] \| --years A-B) [--name N] [--probes K]` | which images of a film to look at for a date, by sampling the film's indexed records |
 | `familysearch film DGS --sheet --from N --to M --step K --out FILE` | contact sheet of numbered thumbnails (at most 48) |
@@ -34,6 +35,10 @@ Notes:
   `reduction` and `saved_size`; crop tighter or raise `--max-tiles` for more detail.
 - `--record 1:1:X` uses the image the record links to (`record` lists them as `image_arks`). Many index-only records (for example the
   German baptism indexes) link no image: the command then stops with `familysearch-no-image-link` and names the record's digital film.
+- `fulltext`: each hit is one page image (`ark` = 3:1:...), with the record type, place, date, collection and excerpts around your words.
+  Follow up with `familysearch image --ark ARK --out page.jpg [--crop ...]`. `--place` and the year range narrow the search;
+  `--type` filters by record type on the pages scanned (up to 4 pages of 50). The handwriting OCR is rough, so try spelling variants
+  (Owry, Oury, Qwry). Image numbers inside a film are not part of these results.
 - `catalog`: first call with only `--place` lists the record types (subjects) the catalog holds for that place; then call again with
   `--subject-id` for the titles (`--years` keeps overlapping dates, `--films` adds each title's films with DGS and contents, one request
   each). The place is matched as containing the text unless `--exact`; use the catalog's own wording (for example
