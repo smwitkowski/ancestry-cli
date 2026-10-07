@@ -73,6 +73,10 @@ see what can be written. Every command prints one JSON object; follow `state` an
 
 `newspapers` searches Chronicling America and the Pennsylvania Newspaper Archive over plain HTTP. See [docs/newspapers.md](docs/newspapers.md).
 
+## Find a Grave (read-only)
+
+`findagrave memorial ID` reads a public memorial (dates, cemetery, bio, family links) and `findagrave photo` saves its photos. No search (robots.txt). See [docs/findagrave.md](docs/findagrave.md).
+
 ## FamilySearch (read-only)
 
 The package also installs `familysearch`, which reads FamilySearch records, tree persons, film catalog entries and record images through a

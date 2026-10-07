@@ -113,6 +113,11 @@ ERRORS = {
     "image-unavailable": Err(True, False, "The record image could not be fetched (no image URL on the viewer page, or no image rights). Check the collection and image ids from a search result; nothing was changed.", [_run("ancestry", "doctor")]),
     "newspapers-tab-required": Err(False, True, "Open https://www.newspapers.com in one tab of the Chrome on this port and sign in by hand (Ancestry sign-in works). Leave the Ancestry tab alone.", [_human("Open Newspapers.com in a tab and sign in."), _run("ancestry", "doctor", when="after-human")]),
     "newspapers-tab-ambiguous": Err(False, True, "More than one Newspapers.com tab is open; leave exactly one.", [_human("Close the extra Newspapers.com tabs.")]),
+    "findagrave-search-not-allowed": Err(False, False, "Find a Grave's robots.txt disallows automated memorial search, so this tool does not search. Find the memorial id in your browser or from a citation, then use `findagrave memorial ID`.", []),
+    "findagrave-check-required": Err(False, False, "Find a Grave refused the request (403 or a bot check). It has been seen to refuse Python builds with an old OpenSSL (openssl in this result; 3.6 works, 3.0 does not): `uv tool install --force --reinstall --python 3.13 .` uses a newer one. Otherwise use the site in your own browser; do not retry in a loop.", []),
+    "findagrave-rate-limited": Err(True, False, "Find a Grave is rate-limiting. Wait a few minutes, then retry.", [_RETRY]),
+    "findagrave-not-found": Err(False, False, "No such memorial or photo. Check the memorial id.", [_edit("Check the id.")]),
+    "findagrave-unavailable": Err(True, False, "Find a Grave did not answer (see status). Retry once later.", [_RETRY]),
     "newspapers-check-required": Err(False, True, "Newspapers.com is showing its bot check. Pass it by hand in that tab, then retry.", [_human("Pass the Newspapers.com check in its tab.")]),
     "newspapers-sign-in-required": Err(False, True, "The Newspapers.com tab is not signed in. Sign in by hand (Ancestry sign-in works), then retry.", [_human("Sign in to Newspapers.com in its tab.")]),
     "newspapers-unavailable": Err(True, False, "Newspapers.com did not return the page (see status). Check the page id.", [_edit("Check the page id.")]),
@@ -216,7 +221,7 @@ def annotate(result):
         actions.append(action)
     result.setdefault("next_actions", actions)
     if "retry_after" not in result:
-        if result["classification"] in ("rate-limited", "newspapers-rate-limited", "familysearch-rate-limited"):
+        if result["classification"] in ("rate-limited", "newspapers-rate-limited", "familysearch-rate-limited", "findagrave-rate-limited"):
             result["retry_after"] = 60
         elif result["classification"] in ("bot-challenge", "bot-challenge-block"):
             until = breaker_until()

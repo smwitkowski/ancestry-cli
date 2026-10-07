@@ -14,6 +14,7 @@ dependencies = ["websockets>=14", "Pillow>=10.4"]
 ancestry = "ancestry_cli.cli:main"
 familysearch = "ancestry_cli.familysearch:main"
 newspapers = "ancestry_cli.papers:main"
+findagrave = "ancestry_cli.findagrave:main"
 
 [dependency-groups]
 dev = ["pytest>=9.1.1"]
