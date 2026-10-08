@@ -5,7 +5,8 @@ Get a memorial id from your browser, from a source citation or from a family lin
 
   findagrave doctor
   findagrave memorial ID [--photos]     (dates, places, cemetery and plot, bio, inscription, family links with memorial ids)
-  findagrave photo ID --out FILE [--n 1]   (save the memorial's Nth photo)
+  findagrave photo MEMORIAL_ID --out FILE [--n 1]   (save the memorial's Nth photo; the photo ids are listed by `memorial ID --photos`;
+                                                     the result repeats memorial_id and photo_id so you can check what was saved)
 
 Requests identify the tool, are 2 s apart under a lock (FINDAGRAVE_CLI_LOCK_FILE shares it), and stop on a bot check or 429.
 """
@@ -204,8 +205,8 @@ def build_parser():
     m = subs.add_parser("memorial", help="one memorial: dates, places, cemetery, bio, family links")
     m.add_argument("id")
     m.add_argument("--photos", action="store_true", help="also list the memorial's photos")
-    ph = subs.add_parser("photo", help="save one of a memorial's photos")
-    ph.add_argument("id")
+    ph = subs.add_parser("photo", help="save one of a MEMORIAL's photos (id = the memorial id, --n = its place in `memorial ID --photos`)")
+    ph.add_argument("id", help="the memorial id (not a photo id, cemetery id or Ancestry record id)")
     ph.add_argument("--out", required=True)
     ph.add_argument("--n", type=int, default=1, help="which photo, starting at 1")
     return p

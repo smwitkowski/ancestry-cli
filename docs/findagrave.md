@@ -7,7 +7,9 @@ browser, from a citation, or from the family links of another memorial.
 - `findagrave memorial ID [--photos]`: name, birth and death (date, place), cemetery (id, name, city, county, state), plot, GPS, bio text,
   inscription, and `family` links (`parents`, `spouses`, `siblings`, `half_siblings`, `children`, each with `memorial_id`, name, born, died).
   `--photos` also lists the memorial's photos (`n`, `photo_id`, `url`).
-- `findagrave photo ID --out FILE [--n 1]`: saves the Nth photo.
+- `findagrave photo MEMORIAL_ID --out FILE [--n 1]`: saves the Nth photo of that memorial. The id is the **memorial id** (not a photo id, a
+  cemetery id or an Ancestry record id); `--n` counts from 1 in the order `memorial ID --photos` lists them. The result gives `memorial_id`,
+  `photo_id`, `n` and `of`, so check them before using the image.
 - Requests identify the tool and are 2 s apart under a lock (`FINDAGRAVE_CLI_LOCK_FILE` shares it).
 
 Environment note: Find a Grave has been seen to answer HTTP 403 to Python builds with an old OpenSSL (3.0) and 200 to a newer one (3.6).
