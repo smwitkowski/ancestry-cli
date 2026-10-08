@@ -201,3 +201,15 @@ def test_son_and_daughter_use_the_sites_child_type_with_a_parent_set():
     b = ops.build("relative-add", tree_id=5, person_id=7, relation="Sister", status="Living", name_id="1", gender_id="2", father_id="",
                   mother_id="3", actor="g")["body"]
     assert b["type"] == "Sister" and b["values"]["genderRadio"] == "Female" and b["values"]["parentSet"] == {"fatherId": "", "motherId": "3"}
+
+
+def test_over_length_source_and_citation_text_is_refused_up_front():
+    import pytest
+    from ancestry_cli import ops
+    with pytest.raises(ops.WriteRequestError) as e:
+        ops.build("citation-add", tree_id=5, person_id=7, title="x" * 257, source_id="3", actor="g")
+    assert e.value.problems == [{"field": "title", "issue": "too-long", "max": 256}]
+    with pytest.raises(ops.WriteRequestError) as e:
+        ops.build("source-create", tree_id=5, person_id=7, title="ok", publication_date="y" * 129, actor="g")
+    assert e.value.problems[0]["field"] == "publication_date"
+    ops.build("citation-add", tree_id=5, person_id=7, title="x" * 256, source_id="3", transcription="t" * 5000, actor="g")

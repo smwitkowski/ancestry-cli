@@ -39,7 +39,7 @@ Notes:
 - `fulltext`: each hit is one page image (`ark` = 3:1:...), with the record type, place, date, collection and excerpts around your words.
   Follow up with `familysearch image --ark ARK --out page.jpg [--crop ...]`. `--place` and the year range narrow the search;
   `--type` filters by record type on the pages scanned (up to 4 pages of 50). The handwriting OCR is rough, so try spelling variants
-  (Owry, Oury, Qwry). Image numbers inside a film are not part of these results.
+  (Owry, Oury, Qwry). Several words widen the search (any of them match): for "Regan" 1.2 million pages, for `Regan Brien` 4.4 million, but for the quoted phrase `"William Regan"` about 20 thousand. AND and OR are ordinary words, not operators. `--collection` takes a numeric id or a string id like `M9J1-SZ4` exactly as a result shows it, and is a hard filter. Image numbers inside a film are not part of these results.
 - `catalog`: first call with only `--place` lists the record types (subjects) the catalog holds for that place; then call again with
   `--subject-id` for the titles (`--years` keeps overlapping dates, `--films` adds each title's films with DGS and contents, one request
   each). The place is matched as containing the text unless `--exact`; use the catalog's own wording (for example

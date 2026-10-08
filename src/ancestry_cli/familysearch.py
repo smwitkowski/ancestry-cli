@@ -610,7 +610,9 @@ def fulltext(*, q, place=None, frm=None, to=None, type_=None, collection=None, l
     if frm or to:
         params["q.recordYear.from"], params["q.recordYear.to"] = str(int(frm or 1400)), str(int(to or 2100))
     if collection:
-        params["c.collectionId"], params["f.collectionId"] = "on", str(int(collection))
+        if not re.fullmatch(r"[A-Za-z0-9-]{1,20}", str(collection)):
+            return failure("invalid-request", problems=[{"field": "collection", "issue": "invalid", "expected": "an id from a result, like 2739057 or M9J1-SZ4"}])
+        params["c.collectionId"], params["f.collectionId"] = "on", str(collection)
     query = urllib.parse.urlencode(params, quote_via=urllib.parse.quote)
     if not re.fullmatch(r"[A-Za-z0-9.%+=&_,'-]{1,800}", query):
         return failure("invalid-request", problems=[{"field": "q", "issue": "invalid"}])
@@ -655,7 +657,7 @@ def _collect(entries, type_, words, full):
 def _fulltext_result(q, data, offset, hits, type_, scanned):
     return {"ok": True, "classification": "familysearch-fulltext", "dispatch_attempted": True, "state": "unchanged", "query": q,
             "total": data.get("results"), "offset": int(offset), "scanned": scanned, "returned": len(hits),
-            "note": "Hits are images; the ARK works with `familysearch image --ark`. OCR of handwriting is rough: try spelling variants."
+            "note": "Hits are images; the ARK works with `familysearch image --ark`. OCR of handwriting is rough: try spelling variants. Several words WIDEN the search (any of them); put a name in quotes (\"William Regan\") to require the phrase; AND and OR are not operators."
                     + (" --type was applied to the pages scanned, not to the whole result set." if type_ else ""),
             "hits": hits}
 
@@ -962,7 +964,7 @@ def build_parser():
     ft.add_argument("--from", dest="frm", type=int, help="record year, from")
     ft.add_argument("--to", type=int, help="record year, to")
     ft.add_argument("--type", dest="type_", help="keep hits whose record type contains this (deed, will, probate, court...); applies to the page returned")
-    ft.add_argument("--collection", type=int, help="a collection id from an earlier result")
+    ft.add_argument("--collection", help="a collection id from an earlier result (numeric or like M9J1-SZ4)")
     ft.add_argument("--limit", type=int, default=10)
     ft.add_argument("--offset", type=int, default=0)
     ft.add_argument("--full", action="store_true", help="include each hit's whole page text")

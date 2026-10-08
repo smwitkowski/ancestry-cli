@@ -216,12 +216,25 @@ _CIT = {"date": "d", "other_info": "oi", "transcription": "trans"}
 _REPO = {"address": "adr", "phone": "ph", "email": "eml", "call_number": "cn", "refn": "refn", "note": "note"}
 
 
+# Ancestry silently cuts these at the stated length (or rejects the second request), so over-length text is refused up front.
+_LIMITS = {"title": 256, "author": 256, "publisher": 256, "publication_place": 256, "publication_date": 128, "call_number": 256, "refn": 256,
+           "date": 256}
+
+
+def _check_lengths(f, names):
+    problems = [{"field": n, "issue": "too-long", "max": _LIMITS[n]} for n in names if isinstance(f.get(n), str) and len(f[n]) > _LIMITS[n]]
+    if problems:
+        raise WriteRequestError("invalid-write-request", problems)
+
+
 def _src_body(title, f):
+    _check_lengths({**f, "title": title}, ("title", "author", "publisher", "publication_place", "publication_date", "call_number", "refn"))
     return {"title": title, **{key: str(f.get(name) or "") for name, key in _SRC.items()},
             "repositoryId": str(f.get("repository_id") or "")}
 
 
 def _cit_body(f):
+    _check_lengths(f, ("title", "date"))
     return {"title": f["title"], "url": f.get("url", ""), **{key: str(f.get(name) or "") for name, key in _CIT.items()},
             "sourceId": str(f["source_id"])}
 
@@ -235,6 +248,7 @@ def _cit_body(f):
            success=lambda d: isinstance(d, dict) and isinstance(d.get("gid"), dict))
 def _source_create(c, f):
     _need(f.get("title"))
+    _check_lengths(f, ("title", "author", "publisher", "publication_place", "publication_date", "call_number", "refn"))
     req = dict(method="POST", path=f"{_PREFIX}/sourceedit/user/{c.actor}/tree/{c.tree_id}/source", body={"title": f["title"]})
     if any(f.get(k) for k in tuple(_SRC) + ("repository_id",)):
         req["then"] = dict(method="PUT", path=f"{_PREFIX}/sourceedit/user/{c.actor}/tree/{c.tree_id}/source/{{id}}",
@@ -292,6 +306,7 @@ def _source_delete(c, f):
            success=lambda d: isinstance(d, dict) and isinstance(d.get("gid"), dict))
 def _citation_add(c, f):
     _need(f.get("title") and _ID.match(str(f.get("source_id", ""))))
+    _check_lengths(f, ("title", "date"))
     req = dict(method="POST", path=f"{_PREFIX}/sourceedit/user/{c.actor}/{c.person}/citation",
                body={"title": f["title"], "url": f.get("url", ""), "sourceId": str(f["source_id"])})
     if any(f.get(k) for k in _CIT):
