@@ -70,17 +70,28 @@ def _fill_path(endpoint, values, inner, tree_id, person_id):
     return path
 
 
+def _preloaded_state(text):
+    """The JSON a search page embeds as window.__PRELOADED_STATE__ (results, columns, counters); ValueError when absent."""
+    start = text.find("__PRELOADED_STATE__")
+    start = text.find("{", start) if start >= 0 else -1
+    if start < 0:
+        raise ValueError("no preloaded state")
+    obj, _ = json.JSONDecoder().raw_decode(text[start:])
+    return obj
+
+
 def _call(endpoint, values, params, full, tree_id, person_id, bridge):
     with rt.lock("ancestry"):
         lease = rt.open_lane(bridge)
         inner = bridge.ChromeBrowserSession(cdp_url=lease.base, target_id=lease.target_id)
         path = _fill_path(endpoint, values, inner, tree_id, person_id)
         lease.check()
-        resp = inner.get(_BASE + path, params=params or None, timeout=60, allow_redirects=False, writes_ok=False)
+        # the search pages (html) redirect to their canonical address; following it is part of reading the page
+        resp = inner.get(_BASE + path, params=params or None, timeout=60, allow_redirects=endpoint.get("group") == "search" and str(endpoint.get("kind") or "html").startswith("html"), writes_ok=False)
     text = resp.text if isinstance(resp.text, str) else ""
     status = getattr(resp, "status_code", None)
     try:
-        body = json.loads(text)
+        body = json.loads(text) if not str(endpoint.get("kind", "")).startswith("html") else _preloaded_state(text)
         out = {"body": body} if full else {"shape": shape(body)}
     except ValueError:
         out = {"text": text[:200_000]} if full else {"text_length": len(text)}

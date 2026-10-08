@@ -213,3 +213,12 @@ def test_over_length_source_and_citation_text_is_refused_up_front():
         ops.build("source-create", tree_id=5, person_id=7, title="ok", publication_date="y" * 129, actor="g")
     assert e.value.problems[0]["field"] == "publication_date"
     ops.build("citation-add", tree_id=5, person_id=7, title="x" * 256, source_id="3", transcription="t" * 5000, actor="g")
+
+
+def test_preloaded_state_is_extracted_from_a_search_page():
+    import pytest
+    from ancestry_cli import reads
+    page = '<script>window.__PRELOADED_STATE__ = {"a": {"b": [1, 2]}, "c": "}"};</script><p>x</p>'
+    assert reads._preloaded_state(page) == {"a": {"b": [1, 2]}, "c": "}"}
+    with pytest.raises(ValueError):
+        reads._preloaded_state("<html>none</html>")

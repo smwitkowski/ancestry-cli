@@ -142,7 +142,10 @@ def _search_loc(q, frm, to, state, paper, limit, page):
         hits.append({"id": pid, "provider": "loc", "title": re.sub(r"^Image \d+ of ", "", r.get("title", "")), "date": r.get("date"),
                      "state": (r.get("location_state") or [None])[0], "url": r.get("url", "").split("&q=")[0].split("?")[0] + "?sp=" + str(r.get("shelf_id") or ""),
                      "snippet": _snippet(" ".join(r.get("description") or []), words)})
-    return {"total": (data.get("pagination") or {}).get("total"), "hits": hits}
+    total = (data.get("pagination") or {}).get("total")
+    if not hits and isinstance(total, int) and total <= 1:
+        total = 0               # loc.gov reports a total of 1 for an empty result set; no page matched
+    return {"total": total, "hits": hits}
 
 
 def _search_pa(q, frm, to, state, paper, limit, page):
@@ -188,6 +191,8 @@ def search(*, q, provider="all", frm=None, to=None, state=None, paper=None, limi
                 skipped.append({"provider": name, "reason": exc.code})
                 continue
             totals[name] = res["total"]
+            if isinstance(res["total"], int) and res["total"] > 1 and not res["hits"]:
+                skipped.append({"provider": name, "reason": f"counted {res['total']} matches but listed none on this page (try --page 2 or narrower dates)"})
             out += res["hits"]
         return {"ok": True, "classification": "newspapers-search", "dispatch_attempted": True, "state": "unchanged", "query": q,
                 "totals": totals, "returned": len(out), "hits": out, "skipped": skipped}

@@ -33,3 +33,8 @@ def test_only_known_hosts_are_fetched():
 def test_bad_arguments_never_hit_the_network():
     assert pp.search(q="")["classification"] == "invalid-request"
     assert pp.search(q="x", provider="nys")["classification"] == "invalid-request"
+
+
+def test_loc_phantom_total_of_one_means_no_hits(monkeypatch):
+    monkeypatch.setattr(pp, "_json", lambda url: {"pagination": {"total": 1}, "results": []})
+    assert pp._search_loc("x", None, None, None, None, 5, 1) == {"total": 0, "hits": []}
