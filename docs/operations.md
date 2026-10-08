@@ -37,6 +37,7 @@ Risk classes:
 | [`tag-add`](#tag-add) | additive | `tags` | Add MyTreeTags to a person (by name or numeric id). |
 | [`tag-remove`](#tag-remove) | destructive | `tags` | Remove MyTreeTags from a person. |
 | [`media-upload`](#media-upload) | additive | `file`, `title` | Upload an image and attach it to a person. |
+| [`media-edit`](#media-edit) | edit | `media_id` | Change a media item's title, date, location or description. |
 | [`media-remove`](#media-remove) | destructive | `media_id` | Permanently delete a media item from the tree. |
 | [`hint-maybe`](#hint-maybe) | hint-state | `hint_id` | Mark a hint Maybe (Undecided). |
 | [`hint-no`](#hint-no) | hint-state | `hint_id` | Mark a hint No (rejected). |
@@ -343,6 +344,20 @@ Upload an image and attach it to a person.
 
 ```bash
 ancestry write media-upload --tree TREE --person PERSON --set file=/abs/photo.jpg --set 'title=Wedding, 1950' --confirm-tree TREE --live
+```
+
+## media-edit
+
+Change a media item's title, date, location or description.
+
+- **Risk:** edit
+- **Required:** `media_id`
+- **Optional:** `title`, `date`, `location`, `description`
+- **Undo:** not undoable; edit it back with the old values
+- **Notes:** Only the fields you give change. person is only the page used for the pre-flight check. The category (photo, document, ...) cannot be changed by this operation yet.
+
+```bash
+ancestry write media-edit --tree TREE --person PERSON --set media_id=00000000-0000-4000-8000-000000000002 --set date='1 Jan 1900' --set location='Baltimore, Maryland, USA' --confirm-tree TREE --live
 ```
 
 ## media-remove

@@ -407,8 +407,23 @@ def _media_upload(c, f):
     return media_upload_plan(c.tree_id, c.person_id, f.get("file"), f.get("title"))
 
 
+@operation("media-edit", summary="Change a media item's title, date, location or description.", risk=EDIT, required=("media_id",),
+           optional=("title", "date", "location", "description"), undo="not undoable; edit it back with the old values",
+           example="--set media_id=00000000-0000-4000-8000-000000000002 --set date='1 Jan 1900' --set location='Baltimore, Maryland, USA'",
+           notes="Only the fields you give change. person is only the page used for the pre-flight check. The category (photo, document, ...) "
+                 "cannot be changed by this operation yet.",
+           success=lambda d: isinstance(d, list) and bool(d))
+def _media_edit(c, f):
+    _need(_UUID.match(str(f.get("media_id", ""))))
+    body = {k: str(f[k]) for k in ("title", "date", "location", "description") if k in f}
+    _need(body, "fields", "missing")
+    _check_lengths(body, [k for k in ("title",) if k in body])
+    return dict(method="PUT", path=f"/api/media/viewer/api/trees/{c.tree_id}/media/{f['media_id']}", body={**body, "type": "p"})
+
+
 @operation("media-remove", summary="Permanently delete a media item from the tree.", risk=DESTRUCTIVE, required=("media_id",),
-           undo="not undoable", example="--set media_id=00000000-0000-4000-8000-000000000002", success=lambda d: d == {})
+           undo="not undoable", example="--set media_id=00000000-0000-4000-8000-000000000002",
+           success=lambda d: d == {} or (isinstance(d, dict) and set(d) == {"message"}))      # the site now answers {"message": ...}
 def _media_remove(c, f):
     _need(_UUID.match(str(f.get("media_id", ""))))
     return dict(method="DELETE", path=f"/api/media/viewer/api/trees/{c.tree_id}/media/{f['media_id']}", body=None)

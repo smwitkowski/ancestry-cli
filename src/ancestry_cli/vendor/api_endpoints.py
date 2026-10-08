@@ -706,6 +706,13 @@ ENDPOINTS = [
         "notes": "Attach an uploaded media item to a person. Response {attaches:[{id,treeMediaId,...}],attachPoint}.",
     },
     {
+        "group": "writes", "name": "media_update", "method": "PUT",
+        "path": "/api/media/viewer/api/trees/{treeId}/media/{mediaId}",
+        "body": {"title": "t", "date": "1 Jan 1900", "location": "place", "description": "d", "type": "p"},
+        "kind": "json", "source": "ui capture 2026-10-08", "side_effect": True,
+        "notes": "Edit a media item's title, date, location or description (the media viewer's details panel). Fields not sent are unchanged.",
+    },
+    {
         "group": "writes", "name": "media_delete", "method": "DELETE",
         "path": "/api/media/viewer/api/trees/{treeId}/media/{mediaId}",
         "kind": "json", "source": "genealogy c51 devtools HAR 2026-10-06", "side_effect": True,
