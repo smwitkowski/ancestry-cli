@@ -126,6 +126,7 @@ ERRORS = {
     "familysearch-tab-ambiguous": Err(False, True, "More than one tab is on www.familysearch.org; leave exactly one.", [_human("Close the extra FamilySearch tabs.")]),
     "familysearch-sign-in-required": Err(False, True, "FamilySearch is signed out. Sign in by hand in that Chrome tab; this tool never types credentials.", [_human("Sign in to FamilySearch in the Chrome tab."), _run("familysearch", "doctor", when="after-human")]),
     "familysearch-check-required": Err(False, True, "FamilySearch is showing a bot check. Do not retry; pass it by hand in the tab, then run `familysearch doctor`.", [_human("Pass the FamilySearch check in the tab."), _run("familysearch", "doctor", when="after-human")]),
+    "familysearch-timeout": Err(True, False, "FamilySearch did not answer in time; the command was stopped and nothing was changed. Retry once, or try a smaller crop or a lower --max-tiles.", [_RETRY, _run("familysearch", "doctor")]),
     "familysearch-rate-limited": Err(True, False, "FamilySearch is rate-limiting. Wait a few minutes before retrying.", [_RETRY]),
     "familysearch-not-found": Err(False, False, "FamilySearch has nothing at that identifier (or you may not see it). Check the ARK, PID, film or image number.", [_edit("Check the identifier.")]),
     "familysearch-unavailable": Err(True, False, "FamilySearch did not return the data (see status). Retry once; if it repeats run `familysearch doctor`.", [_RETRY, _run("familysearch", "doctor")]),

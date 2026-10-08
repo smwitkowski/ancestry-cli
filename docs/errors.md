@@ -78,6 +78,7 @@ Exit codes: `0` ok, `1` failed with nothing changed, `2` bad usage, `3` state un
 | `familysearch-tab-ambiguous` | no | yes | More than one tab is on www.familysearch.org; leave exactly one. | human: Close the extra FamilySearch tabs. |
 | `familysearch-sign-in-required` | no | yes | FamilySearch is signed out. Sign in by hand in that Chrome tab; this tool never types credentials. | human: Sign in to FamilySearch in the Chrome tab.<br>run: `familysearch doctor` *(after-human)* |
 | `familysearch-check-required` | no | yes | FamilySearch is showing a bot check. Do not retry; pass it by hand in the tab, then run `familysearch doctor`. | human: Pass the FamilySearch check in the tab.<br>run: `familysearch doctor` *(after-human)* |
+| `familysearch-timeout` | yes | no | FamilySearch did not answer in time; the command was stopped and nothing was changed. Retry once, or try a smaller crop or a lower --max-tiles. | retry: retry the same command<br>run: `familysearch doctor` |
 | `familysearch-rate-limited` | yes | no | FamilySearch is rate-limiting. Wait a few minutes before retrying. | retry: retry the same command |
 | `familysearch-not-found` | no | no | FamilySearch has nothing at that identifier (or you may not see it). Check the ARK, PID, film or image number. | edit-args: Check the identifier. |
 | `familysearch-unavailable` | yes | no | FamilySearch did not return the data (see status). Retry once; if it repeats run `familysearch doctor`. | retry: retry the same command<br>run: `familysearch doctor` |

@@ -111,3 +111,10 @@ def test_fulltext_excerpts_and_inputs():
     assert fs.fulltext(q="")["classification"] == "invalid-request"
     fs._check({"path": "/service/search/fulltext/search?q.text=Ringgold&q.place=Queen%20Anne%27s%20County%2C%20Maryland&count=5&offset=0"})
     assert fs._viewable("ThemisPrmRegisteredPatron")
+
+
+def test_dgs_numbers_are_padded_to_nine_digits():
+    assert fs._pad(4268340) == "004268340" and fs._pad("004268340") == "004268340" and fs._pad("004114552_001_M9K5-KWL") == "004114552_001_M9K5-KWL"
+    assert fs._film_body("7836000")["args"]["dgsNum"] == "007836000"
+    data = {"dgsNum": "007836000", "catalogs": [{"data": {"film_note": "just text"}}]}
+    assert fs._sections(data) == [{"label": "", "years": None}]

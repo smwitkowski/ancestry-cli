@@ -89,7 +89,9 @@ _FETCH_JS = r"""(async (spec) => {
     let body;
     if (c.body) { headers['Content-Type'] = 'application/json'; body = JSON.stringify(c.body).split('__SESSION__').join(tok); }
     try {
-      const r = await fetch(c.path, {method: c.method, credentials: 'include', cache: 'no-store', redirect: 'manual', headers, body});
+      const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 45000);       // no request may stall the whole command
+      const r = await fetch(c.path, {method: c.method, credentials: 'include', cache: 'no-store', redirect: 'manual', headers, body, signal: ctl.signal});
+      clearTimeout(timer);
       const ctype = r.headers.get('content-type') || '';
       const row = {status: r.status, type: ctype, redirected: r.type === 'opaqueredirect', signed_in: !!tok};
       if (c.binary) {
@@ -98,7 +100,7 @@ _FETCH_JS = r"""(async (spec) => {
         row.b64 = btoa(s);
       } else { row.text = clean(await r.text()); }
       out.push(row);
-    } catch (e) { out.push({status: 0, error: 'fetch-failed', signed_in: !!tok}); }
+    } catch (e) { out.push({status: 0, error: (e && e.name === 'AbortError') ? 'timeout' : 'fetch-failed', signed_in: !!tok}); }
   }
   return JSON.stringify({page: location.origin, calls: out});
 })"""
@@ -159,7 +161,11 @@ def fetch(calls, *, pause=0.0):
         _check(c)
     with rt.quiet(), rt.lock("familysearch", path=lock_file(), interval=PACE):
         lease = _lease().check()
-        result = asyncio.run(_evaluate(lease, calls, pause))
+        budget = 60 + len(calls) * (pause + 50)          # each call is cut off at 45 s in the page; this bounds the whole command
+        try:
+            result = asyncio.run(asyncio.wait_for(_evaluate(lease, calls, pause), budget))
+        except TimeoutError:
+            raise LaneError("familysearch-timeout") from None
         lease.check()
     if result.get("page") != ORIGIN:
         raise LaneError("familysearch-tab-required")
@@ -173,7 +179,7 @@ def _classify(row):
     status = row.get("status")
     text = row.get("text") or ""
     if status == 0:
-        raise LaneError("familysearch-unavailable", status=0)
+        raise LaneError("familysearch-timeout" if row.get("error") == "timeout" else "familysearch-unavailable", status=0)
     if status in (401, 403) or (status == 200 and "Just a moment" in text[:2000]):
         if "Just a moment" in text[:2000] or "cf-" in text[:2000].lower() or row.get("type", "").startswith("text/html") and status == 403:
             raise LaneError("familysearch-check-required", status=status)
@@ -343,7 +349,14 @@ def person(pid, *, sources=False):
     return _guard(run)
 
 
+def _pad(dgs):
+    """FamilySearch's film service wants nine digits; catalog entries print DGS numbers unpadded (4268340 is 004268340)."""
+    text = str(dgs)
+    return text.zfill(9) if text.isdigit() and len(text) < 9 else text
+
+
 def _film_body(dgs):
+    dgs = _pad(dgs)
     return {"type": "film-data", "loggedIn": True, "sessionId": "__SESSION__",
             "args": {"dgsNum": dgs, "state": {"cc": None, "imageOrFilmUrl": f"/search/film/{dgs}", "collectionContext": None, "viewMode": "g"},
                      "locale": "en"}}
@@ -357,9 +370,11 @@ def film(dgs):
         row, = fetch([{"method": "POST", "path": "/search/filmdatainfo/film-data", "accept": "application/json", "body": _film_body(dgs)}])
         data = _json(row)
         cat = ((data.get("catalogs") or [{}])[0]).get("data") or {}
+        raw = cat.get("film_note") or []
+        raw = [raw] if isinstance(raw, (dict, str)) else raw
         notes = [{"film": n.get("filmno"), "dgs": n.get("digital_film_no"), "contents": n.get("text"), "items": n.get("items") or None}
-                 for n in cat.get("film_note", [])]
-        return {"ok": True, "classification": "familysearch-film", "dispatch_attempted": True, "state": "unchanged", "dgs": str(dgs),
+                 if isinstance(n, dict) else {"film": None, "dgs": None, "contents": str(n), "items": None} for n in raw]
+        return {"ok": True, "classification": "familysearch-film", "dispatch_attempted": True, "state": "unchanged", "dgs": _pad(dgs),
                 "title": cat.get("display_title"), "dates": cat.get("inclusive_dates"), "format": cat.get("format"),
                 "place": next(((s or {}).get("text") for s in cat.get("subjectLocality") or []), None),
                 "images": len(data.get("images") or []), "film_notes": notes}
@@ -426,7 +441,7 @@ def catalog(*, place, subject_id=None, years=None, limit=10, films=False, exact=
                 notes = [n for n in ([notes] if isinstance(notes, dict) else notes) if isinstance(n, dict)]
                 seen, out = set(), []
                 for n in notes:
-                    film = {"film": str(n.get("filmno") or "") or None, "dgs": str(n.get("digital_film_no") or "") or None,
+                    film = {"film": str(n.get("filmno") or "") or None, "dgs": _pad(n.get("digital_film_no")) if n.get("digital_film_no") else None,
                             "contents": n.get("text"), "items": n.get("items") or None}
                     key = json.dumps(film, sort_keys=True)
                     if key not in seen:
@@ -647,6 +662,7 @@ def _fulltext_result(q, data, offset, hits, type_, scanned):
 
 # ------------------------------------------------------------------------------------------------ browsing a film
 def _film_data(dgs):
+    dgs = _pad(dgs)
     row, = fetch([{"method": "POST", "path": "/search/filmdatainfo/film-data", "accept": "application/json", "body": _film_body(str(dgs))}])
     data = _json(row)
     arks = [m.group(0) for u in data.get("images") or [] for m in [re.search(r"3:1:[A-Z0-9-]+", str(u))] if m]
@@ -657,8 +673,9 @@ def _sections(data):
     """The film's contents text split into sections: [{label, years}]. Image ranges are not published for most films."""
     cat = ((data.get("catalogs") or [{}])[0]).get("data") or {}
     dgs = str(data.get("dgsNum"))
-    notes = [n for n in cat.get("film_note") or [] if isinstance(n, dict)]
-    mine = next((n for n in notes if str(n.get("digital_film_no")) == dgs), notes[0] if len(notes) == 1 else None)
+    raw = cat.get("film_note") or []
+    notes = [n for n in ([raw] if isinstance(raw, dict) else raw) if isinstance(n, dict)]
+    mine = next((n for n in notes if str(n.get("digital_film_no")).zfill(9) == dgs.zfill(9)), notes[0] if len(notes) == 1 else None)
     out = []
     for part in str((mine or {}).get("text") or "").split(" -- "):
         m = re.search(r"(\d{4})(?:\s*-\s*(\d{4}))?", part)
