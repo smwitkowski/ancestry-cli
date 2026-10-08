@@ -229,3 +229,20 @@ def test_couple_terms_reach_the_collection_search():
     name, path, params = reads._named("search", given="Michl", surname="Ryan", birth=None, death=None, location=None, collection=61039,
                                       record_id=None, counts=False, tree_id=None, person_id=None, spouse="Ellen_Greely")
     assert name == "collection_lane" and path == {"collectionId": "61039"} and params == {"name": "Michl_Ryan", "spouse": "Ellen_Greely"}
+
+
+def test_relationship_remove_and_child_link_bodies():
+    import pytest
+    from ancestry_cli import ops
+    r = ops.build("relationship-remove", tree_id=5, person_id=7, other="9", type="W", actor="g")
+    assert r["path"].endswith("/person/7/relationship/9/removerelationship") and r["body"] == {"type": "W", "parentType": "F"}
+    with pytest.raises(ops.WriteRequestError):
+        ops.build("relationship-remove", tree_id=5, person_id=7, other="7", type="W", actor="g")
+    with pytest.raises(ops.WriteRequestError):
+        ops.build("relationship-remove", tree_id=5, person_id=7, other="9", type="X", actor="g")
+    b = ops.build("relative-link", tree_id=5, person_id=7, relation="Son", existing_person_id="9", father_id="7", mother_id="3", actor="g")["body"]
+    assert b["type"] == "Child" and b["values"]["apmFindExistingPerson"]["PID"] == 9
+    assert b["values"]["parentSet"] == {"fatherId": "7", "motherId": "3"} and b["values"]["params"]["parentSet"] == b["values"]["parentSet"]
+    assert b["values"]["relationModifier"] == 4 and b["values"]["reverseRelation"] == "f"
+    spouse = ops.build("relative-link", tree_id=5, person_id=7, relation="Spouse", existing_person_id="9", actor="g")["body"]
+    assert spouse["type"] == "Spouse" and "parentSet" not in spouse["values"]

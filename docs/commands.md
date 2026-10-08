@@ -112,6 +112,13 @@ Ancestry's search is ranked, not filtered: a record that names the couple togeth
 own spouse field. `--collection C` now uses the collection's own search page, which works for every collection (the older results endpoint
 returned nothing for some, such as 61039) and returns the same `results.hitCount` and `results.items`.
 
+Relationships: `write relative-link` places an existing person as a relative (Spouse, Father, Mother, Son, Daughter, Brother, Sister: all
+verified live). For Son and Daughter, `--person` is the parent and `--set other_parent=<spouse id>|unknown` picks the couple; linking a
+child who sits in a "father and unknown spouse" family MOVES them into the known couple (the unknown-spouse family disappears).
+`write relationship-remove --person P --set other=Q --set type=W|H|F|M|C [--set parent_type=F|M]` removes one relationship and keeps both
+people: from P's side, `W`/`H` when Q is P's wife/husband, `F`/`M` (with the same `parent_type`) when Q is P's father/mother, `C` when Q is
+P's child. It needs explicit approval for real trees; the journal does not undo it (re-link with `relative-link`).
+
 ### `ancestry read hints --tree T --person P`, `ancestry read record --collection C --record R`
 Hints page data and a record's details. **Take record and collection ids from a live search result**, not from examples.
 ### `ancestry read list [GROUP]` / `ancestry read get NAME [--tree T --person P --path k=v --param k=v] [--full]`

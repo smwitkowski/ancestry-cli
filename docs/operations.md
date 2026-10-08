@@ -20,6 +20,7 @@ Risk classes:
 | [`fact-remove`](#fact-remove) | destructive | `--assertion` | Delete a fact. |
 | [`relative-add`](#relative-add) | structural | `relation`, `status` | Create a new person and link them to this person as a relative. |
 | [`relative-link`](#relative-link) | structural | `relation`, `existing_person_id` | Link a person who is already in the tree as a relative of this person. |
+| [`relationship-remove`](#relationship-remove) | destructive | `other`, `type` | Remove one relationship between two people; both people stay in the tree. |
 | [`person-remove`](#person-remove) | destructive | - | Permanently delete a person from the tree. |
 | [`source-create`](#source-create) | additive | `title` | Create a custom source in the tree. |
 | [`source-edit`](#source-edit) | edit | `source_id` | Change a source's fields. Fields you do not give keep their current values. |
@@ -106,12 +107,26 @@ Link a person who is already in the tree as a relative of this person.
 
 - **Risk:** structural
 - **Required:** `relation`, `existing_person_id`
-- **Optional:** `name`
-- **Undo:** not undoable: no relationship-only removal route is known; remove the relationship in the Ancestry UI
-- **Notes:** Find the person first with `find --complete`. The relationship is the same kind the UI's "From your tree" option creates. Check the result with `ancestry person`: the response body does not confirm the link.
+- **Optional:** `name`, `other_parent`
+- **Undo:** `relationship-remove` takes the link out again (the journal does not do it for you)
+- **Notes:** Find the person first with `find --complete`. The relationship is the same kind the UI's "From your tree" option creates. Son and Daughter place the existing person as this person's child in the family with other_parent (a spouse's person id, or `unknown`; needed only with more than one spouse), so children land in the right couple. Brother and Sister go under this person's own parents. Check the result with `ancestry person`: the response body does not confirm the link.
 
 ```bash
-ancestry write relative-link --tree TREE --person PERSON --set relation=Father --set existing_person_id=100000000001 --confirm-tree TREE --live
+ancestry write relative-link --tree TREE --person PERSON --set relation=Son --set existing_person_id=100000000001 --set other_parent=100000000002 --confirm-tree TREE --live
+```
+
+## relationship-remove
+
+Remove one relationship between two people; both people stay in the tree.
+
+- **Risk:** destructive
+- **Required:** `other`, `type`
+- **Optional:** `parent_type`
+- **Undo:** not undoable by the journal: re-link with relative-link (the before-family is in the snapshot of `ancestry person`)
+- **Notes:** person is the person whose side the relationship is stored on; other is the related person. type is the code stored from person's side: H or W for a spouse (the other was added as husband or wife), F or M when the other is person's father or mother, C when the other is person's child. If a removal does nothing, try the opposite code (check with `ancestry person` on both people). parent_type (F or M) names the parent slot for a parent row; it defaults to F. The response has no relationship id, so check the family on both people afterwards.
+
+```bash
+ancestry write relationship-remove --tree TREE --person PERSON --set other=100000000002 --set type=H --confirm-tree TREE --live
 ```
 
 ## person-remove

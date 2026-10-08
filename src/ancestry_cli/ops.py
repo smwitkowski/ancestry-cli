@@ -182,21 +182,52 @@ def _relative_add(c, f):
 
 
 @operation("relative-link", summary="Link a person who is already in the tree as a relative of this person.", risk=STRUCTURAL,
-           required=("relation", "existing_person_id"), optional=("name",), choices={"relation": _RELATIONS},
-           undo="not undoable: no relationship-only removal route is known; remove the relationship in the Ancestry UI",
-           example="--set relation=Father --set existing_person_id=100000000001",
+           required=("relation", "existing_person_id"), optional=("name", "other_parent"), choices={"relation": _RELATIONS},
+           undo="`relationship-remove` takes the link out again (the journal does not do it for you)",
+           example="--set relation=Son --set existing_person_id=100000000001 --set other_parent=100000000002",
            notes="Find the person first with `find --complete`. The relationship is the same kind the UI's \"From your tree\" option "
-                 "creates. Check the result with `ancestry person`: the response body does not confirm the link.",
+                 "creates. Son and Daughter place the existing person as this person's child in the family with other_parent (a spouse's person "
+                 "id, or `unknown`; needed only with more than one spouse), so children land in the right couple. Brother and Sister go under this "
+                 "person's own parents. Check the result with `ancestry person`: the response body does not confirm the link.",
            success=lambda d: isinstance(d, dict) and not d.get("ErrorCode"))
 def _relative_link(c, f):
     _need(f.get("relation") in _RELATIONS and _ID.match(str(f.get("existing_person_id", ""))), "existing_person_id")
     _need(str(f["existing_person_id"]) != str(c.person_id), "existing_person_id", "invalid")
+    existing = {"name": f.get("name", ""), "birth": "", "death": "", "PID": int(f["existing_person_id"]), "genderIconType": ""}
+    values = {"apmFindExistingPerson": existing, "attachedChildren": []}
+    relation = f["relation"]
+    if relation in ("Son", "Daughter", "Brother", "Sister"):
+        _need("father_id" in f and "mother_id" in f, "parents", "missing")          # filled in by the sender from the page
+        parent_set = {"fatherId": str(f["father_id"]), "motherId": str(f["mother_id"])}
+        male = relation in ("Son", "Brother")
+        existing["genderIconType"] = "Male" if male else "Female"
+        values = {"genderRadio": "Male" if male else "Female", "selectedPerson": dict(existing), "relationModifier": 4, "parentSet": parent_set,
+                  "apmFindExistingPerson": existing}
+        if relation in ("Son", "Daughter"):
+            values.update({"relation": "c", "reverseRelation": "m" if f.get("anchor_gender") == "Female" else "f",
+                           "params": {"type": "Child", "originalModifier": "0", "modifier": 4, "existpid": str(c.person_id), "relation": "c",
+                                      "isSibling": False, "isAltParent": False, "priority": "0", "zeroState": False, "parentSet": parent_set}})
     return dict(method="POST", path=f"{_PREFIX}/addedit/user/{c.actor}/{c.person}/addperson",
                 body={"person": {"personId": str(c.person_id), "treeId": str(c.tree_id), "userId": c.actor},
-                      "type": f["relation"],
-                      "values": {"apmFindExistingPerson": {"name": f.get("name", ""), "birth": "", "death": "",
-                                                           "PID": int(f["existing_person_id"]), "genderIconType": ""},
-                                 "attachedChildren": []}})
+                      "type": "Child" if relation in ("Son", "Daughter") else relation, "values": values})
+
+
+@operation("relationship-remove", summary="Remove one relationship between two people; both people stay in the tree.", risk=DESTRUCTIVE,
+           required=("other", "type"), optional=("parent_type",), choices={"type": ("H", "W", "F", "M", "C")},
+           undo="not undoable by the journal: re-link with relative-link (the before-family is in the snapshot of `ancestry person`)",
+           example="--set other=100000000002 --set type=H",
+           notes="person is the person whose side the relationship is stored on; other is the related person. type is the code stored from "
+                 "person's side: H or W for a spouse (the other was added as husband or wife), F or M when the other is person's father or "
+                 "mother, C when the other is person's child. If a removal does nothing, try the opposite code (check with `ancestry person` on "
+                 "both people). parent_type (F or M) names the parent slot for a parent row; it defaults to F. The response has no "
+                 "relationship id, so check the family on both people afterwards.",
+           success=lambda d: isinstance(d, dict) and bool(d.get("tgid")))
+def _relationship_remove(c, f):
+    _need(_ID.match(str(f.get("other", ""))) and str(f["other"]) != str(c.person_id), "other")
+    _need(f.get("type") in ("H", "W", "F", "M", "C"), "type")
+    _need(f.get("parent_type", "F") in ("F", "M"), "parent_type")
+    return dict(method="POST", path=f"{_PREFIX}/addedit/user/{c.actor}/{c.person}/relationship/{f['other']}/removerelationship",
+                body={"type": f["type"], "parentType": f.get("parent_type", "F")})
 
 
 @operation("person-remove", summary="Permanently delete a person from the tree.", risk=DESTRUCTIVE, optional=("name",),
@@ -547,7 +578,8 @@ def _write(*, op, tree_id, person_id, dry_run, confirm_tree, force, **fields):
         return send(op=op, tree_id=tree_id, person_id=person_id, req_hash=req_hash, **fields)
     # dry-run: fill what the live sender reads from the page, so the request shape can be shown
     placeholders = {"person-remove": {"name": "<read from the page>"}, "fact-edit": {"eventType": "<current value>"},
-                    "relative-add": {"name_id": "0", "gender_id": "0", "father_id": "0", "mother_id": "0"}}.get(op, {})
+                    "relative-add": {"name_id": "0", "gender_id": "0", "father_id": "0", "mother_id": "0"},
+                    "relative-link": {"father_id": "0", "mother_id": "0"}}.get(op, {})
     fields = {**fields, **{k: v for k, v in placeholders.items() if not fields.get(k)}}
     try:
         req = build(op, tree_id=tree_id, person_id=person_id, **fields)

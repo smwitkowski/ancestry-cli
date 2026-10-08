@@ -706,6 +706,13 @@ ENDPOINTS = [
         "notes": "Attach an uploaded media item to a person. Response {attaches:[{id,treeMediaId,...}],attachPoint}.",
     },
     {
+        "group": "writes", "name": "relationship_remove", "method": "POST",
+        "path": "/family-tree/person/addedit/user/{userId}/tree/{treeId}/person/{personId}/relationship/{otherPersonId}/removerelationship",
+        "body": {"type": "H", "parentType": "F"},
+        "kind": "json", "source": "supervisor capture 2026-10-08", "side_effect": True,
+        "notes": "Remove ONE relationship between two people; both stay in the tree (UI: Edit relationships, Remove relationship).",
+    },
+    {
         "group": "writes", "name": "media_update", "method": "PUT",
         "path": "/api/media/viewer/api/trees/{treeId}/media/{mediaId}",
         "body": {"title": "t", "date": "1 Jan 1900", "location": "place", "description": "d", "type": "p"},

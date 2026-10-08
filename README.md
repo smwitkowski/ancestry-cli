@@ -85,7 +85,7 @@ second Chrome on port 9223. See [docs/familysearch.md](docs/familysearch.md).
 ## Commands at a glance
 
 `doctor` · `whoami [--pin]` · `trees` · `find` · `person` · `read` (search, hints, record, any known read) · `collections` (find, describe, list) · `sources` · `match` · `newspapers` · `apply` · `hint list|accept` ·
-`write OP` (29 operations, `ancestry ops` describes them) · `journal list|undo|verify|resolve` · `lane reset`.
+`write OP` (30 operations, `ancestry ops` describes them) · `journal list|undo|verify|resolve` · `lane reset`.
 Details and flags: [docs/commands.md](docs/commands.md).
 
 ## Safety in one paragraph

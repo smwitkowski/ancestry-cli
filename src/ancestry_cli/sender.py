@@ -224,6 +224,9 @@ def _prepare(w, fields):
         fields.setdefault("anchor_gender", _anchor_gender(w.page_text))
         if fields["relation"] in ("Son", "Daughter", "Brother", "Sister"):
             fields["father_id"], fields["mother_id"] = _parent_set(w, fields)
+    elif w.op == "relative-link" and fields.get("relation") in ("Son", "Daughter", "Brother", "Sister"):
+        fields.setdefault("anchor_gender", _anchor_gender(w.page_text))
+        fields["father_id"], fields["mother_id"] = _parent_set(w, fields)
     elif w.op == "source-delete":
         _check_source_title(w, fields)
     elif w.op == "source-edit":
