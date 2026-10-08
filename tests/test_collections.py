@@ -222,3 +222,10 @@ def test_preloaded_state_is_extracted_from_a_search_page():
     assert reads._preloaded_state(page) == {"a": {"b": [1, 2]}, "c": "}"}
     with pytest.raises(ValueError):
         reads._preloaded_state("<html>none</html>")
+
+
+def test_couple_terms_reach_the_collection_search():
+    from ancestry_cli import reads
+    name, path, params = reads._named("search", given="Michl", surname="Ryan", birth=None, death=None, location=None, collection=61039,
+                                      record_id=None, counts=False, tree_id=None, person_id=None, spouse="Ellen_Greely")
+    assert name == "collection_lane" and path == {"collectionId": "61039"} and params == {"name": "Michl_Ryan", "spouse": "Ellen_Greely"}

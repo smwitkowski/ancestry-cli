@@ -180,7 +180,7 @@ def test_named_reads_map_to_inventory_endpoints():
 
     assert named("search", given="Mary Ann", surname="Smith", birth="1900") == (
         "search_results", {}, {"name": "Mary+Ann_Smith", "priority": "usa", "searchMode": "advanced", "birth": "1900"})
-    assert named("search", surname="Smith", collection=6224)[0] == "collection_results"
+    assert named("search", surname="Smith", collection=6224)[0] == "collection_lane"
     assert named("search", surname="Smith", counts=True)[0] == "hit_counts"
     assert named("hints", tree_id=1, person_id=2)[2]["personId"] == "2"
     assert named("record", collection=5, record_id=6)[1] == {"collectionId": "5", "recordId": "6"}

@@ -295,7 +295,8 @@ ENDPOINTS = [
     {
         "group": "search", "name": "collection_lane", "method": "GET",
         "path": "/search/collections/{collectionId}/",
-        "query": {"name": {"sample": "Jane+Q_Example"}},
+        "query": {
+            "spouse": {"sample": "Mary_Smith"}, "child": {"sample": "Ann_Smith"}, "birth": {"sample": "1900"}, "searchMode": {"sample": "advanced"},"name": {"sample": "Jane+Q_Example"}},
         "kind": "html_preloaded_state", "source": "§14",
         "notes": "Collection-specific result columns differ from global cards. e.g. 1930 census exposes `Parent or Spouse Names`, `Home in 1930`."
     },
@@ -311,6 +312,7 @@ ENDPOINTS = [
         "group": "search", "name": "search_results", "method": "GET",
         "path": "/api/search-results",
         "query": {
+            "spouse": {"sample": "Mary_Smith"}, "child": {"sample": "Ann_Smith"},
             "name": {"sample": "Jane+Q_Example", "required": True},
             "birth": {"sample": "1900-1-1_springfield-sangamon-illinois-usa_5000"},
             "death": {"sample": "1970-1-1_springfield-sangamon-illinois-usa_5000"},
@@ -328,6 +330,7 @@ ENDPOINTS = [
         "group": "search", "name": "hit_counts", "method": "GET",
         "path": "/api/search-results/hit-counts",
         "query": {
+            "spouse": {"sample": "Mary_Smith"}, "child": {"sample": "Ann_Smith"},
             "name": {"sample": "Jane+Q_Example"},
             "birth": {"sample": "1900-1-1_springfield-sangamon-illinois-usa_5000"},
             "category": {"sample": "34"},
@@ -345,6 +348,7 @@ ENDPOINTS = [
         "group": "search", "name": "collection_results", "method": "GET",
         "path": "/api/search-results/collection-results",
         "query": {
+            "spouse": {"sample": "Mary_Smith"}, "child": {"sample": "Ann_Smith"},
             "name": {"sample": "Jane+Q_Example"},
             "birth": {"sample": "1900-1-1_springfield-sangamon-illinois-usa_5000"},
             "collections": {"sample": SAMPLE["collectionId"]},

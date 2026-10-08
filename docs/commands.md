@@ -107,6 +107,11 @@ first fields, whether an image exists) and the family in that other tree (parent
 from another member's tree, never proof. A suggestion who may be living is redacted unless `--include-living`.
 Accepting a suggested parent is not built yet: it needs a capture of the accept request on a sandbox tree.
 
+Couple search: `read search` and `match` take `--spouse-given` / `--spouse-surname` (and `read search` also `--child-given` / `--child-surname`).
+Ancestry's search is ranked, not filtered: a record that names the couple together moves up, but the total does not drop. Check each hit's
+own spouse field. `--collection C` now uses the collection's own search page, which works for every collection (the older results endpoint
+returned nothing for some, such as 61039) and returns the same `results.hitCount` and `results.items`.
+
 ### `ancestry read hints --tree T --person P`, `ancestry read record --collection C --record R`
 Hints page data and a record's details. **Take record and collection ids from a live search result**, not from examples.
 ### `ancestry read list [GROUP]` / `ancestry read get NAME [--tree T --person P --path k=v --param k=v] [--full]`

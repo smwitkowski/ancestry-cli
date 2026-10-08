@@ -30,16 +30,17 @@ def _endpoints(bridge):
     return [e for e in bridge.ENDPOINTS if e["method"] == "GET" and not e.get("side_effect")]
 
 
-def _named(action, *, given, surname, birth, death, location, collection, record_id, counts, tree_id, person_id):
+def _named(action, *, given, surname, birth, death, location, collection, record_id, counts, tree_id, person_id, spouse=None, child=None):
     """A named shortcut -> (endpoint name, path params, query params), or None when inputs are missing."""
     if action == "search":
         if not surname:
             return None
         # birth/death/location take the site's own `YYYY[-M-D][_place-slug]` form
         params = {"name": f"{(given or '').replace(' ', '+')}_{surname.replace(' ', '+')}", "priority": "usa", "searchMode": "advanced"}
-        params.update({k: v for k, v in (("birth", birth), ("death", death), ("location", location)) if v})
+        params.update({k: v for k, v in (("birth", birth), ("death", death), ("location", location), ("spouse", spouse), ("child", child)) if v})
         if collection:
-            return "collection_results", {}, {**params, "collections": str(collection)}
+            # the collection's own search page works for every collection and takes the spouse and child terms
+            return "collection_lane", {"collectionId": str(collection)}, {k: v for k, v in params.items() if k not in ("priority", "searchMode")}
         return ("hit_counts" if counts else "search_results"), {}, params
     if action == "hints":
         if tree_id is None or person_id is None:
@@ -105,10 +106,14 @@ def _call(endpoint, values, params, full, tree_id, person_id, bridge):
 
 
 def read(*, action, name=None, tree_id=None, person_id=None, path_params=None, params=None, full=False, bridge=None,
-         given=None, surname=None, birth=None, death=None, location=None, collection=None, record_id=None, counts=False):
+         given=None, surname=None, birth=None, death=None, location=None, collection=None, record_id=None, counts=False,
+         spouse=None, child=None):
+    searched_collection = False
     if action in ("search", "hints", "record"):
         plan = _named(action, given=given, surname=surname, birth=birth, death=death, location=location,
-                      collection=collection, record_id=record_id, counts=counts, tree_id=tree_id, person_id=person_id)
+                      collection=collection, record_id=record_id, counts=counts, tree_id=tree_id, person_id=person_id,
+                      spouse=spouse, child=child)
+        searched_collection = bool(collection)
         if plan is None:
             return failure("missing-arguments")
         name, path_params, params = plan
@@ -133,7 +138,12 @@ def read(*, action, name=None, tree_id=None, person_id=None, path_params=None, p
         values.setdefault("personId", str(person_id))
     try:
         with rt.quiet():
-            return _call(endpoint, values, params, full, tree_id, person_id, bridge)
+            out = _call(endpoint, values, params, full, tree_id, person_id, bridge)
+        body = out.get("body") if isinstance(out, dict) else None
+        if searched_collection and isinstance(body, dict) and (body.get("results") or {}).get("results"):
+            inner = body["results"]            # normalise to the shape a collection search always returned
+            out["body"] = {"results": inner["results"], **{k: inner.get(k) for k in ("collectionTitle", "collectionId", "searchDescription")}}
+        return out
     except LaneError as exc:
         return failure(exc.code, **exc.detail)
     except Exception as exc:

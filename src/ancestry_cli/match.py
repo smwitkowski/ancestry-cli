@@ -35,10 +35,10 @@ def _name(item):
     return next((f.get("text") for f in item.get("fields", []) if f.get("label") == "Name"), None)
 
 
-def match(*, surname, given=None, birth=None, death=None, location=None, collection=None, limit=5, bridge=None):
+def match(*, surname, given=None, birth=None, death=None, location=None, collection=None, limit=5, bridge=None, spouse=None):
     if not surname:
         return failure("missing-arguments")
-    terms = dict(given=given, surname=surname, birth=birth, death=death, location=location, full=True, bridge=bridge)
+    terms = dict(given=given, surname=surname, birth=birth, death=death, location=location, full=True, bridge=bridge, spouse=spouse)
     found = reads.read(action="search", **terms)                 # the all-records search carries requestBase64
     if not found.get("ok"):
         return found

@@ -122,6 +122,9 @@ def build_parser():
     p.add_argument("--collection", type=int)
     p.add_argument("--record", dest="record_id", type=int)
     p.add_argument("--counts", action="store_true")
+    for who in ("spouse", "child"):
+        p.add_argument(f"--{who}-given", help=f"{who}'s given name: a couple search ranks records that name them together")
+        p.add_argument(f"--{who}-surname")
     p.add_argument("--image", dest="image_id", help="image id, for `read image` (from a search result's imageIds)")
     p.add_argument("--crop", help="x,y,w,h in pixels, or fractions of the image (all <= 1), for `read image`")
     p.add_argument("--out", help="new file to write, for `read image`")
@@ -136,6 +139,7 @@ def build_parser():
     for option in ("given", "surname", "birth", "death", "location"):
         p.add_argument("--" + option)
     p.add_argument("--collection", type=int)
+    p.add_argument("--spouse-given"); p.add_argument("--spouse-surname")
     p.add_argument("--limit", type=int, default=5, help="how many hits to score (max 20)")
 
     p = subs.add_parser("newspapers", help="Newspapers.com page facts: paper, access, names mentioned (needs your signed-in tab)", allow_abbrev=False)
@@ -254,6 +258,8 @@ def _run(command, args):
         return newspapers_page(page_id=args["page_id"])
     if command == "match":
         from .match import match
+        g, sname = args.pop("spouse_given", None), args.pop("spouse_surname", None)
+        args["spouse"] = f"{(g or '').replace(' ', '+')}_{(sname or '').replace(' ', '+')}" if (g or sname) else None
         return match(**args)
     if command == "apply":
         from .apply import apply as apply_manifest
@@ -303,6 +309,9 @@ def _run(command, args):
         from .reads import read
         for extra in ("image_id", "crop", "out"):
             args.pop(extra, None)
+        for who in ("spouse", "child"):
+            g, sname = args.pop(f"{who}_given", None), args.pop(f"{who}_surname", None)
+            args[who] = f"{(g or '').replace(' ', '+')}_{(sname or '').replace(' ', '+')}" if (g or sname) else None
         return read(**{**args, "path_params": _fields(args["path_params"]), "params": _fields(args["params"])})
     if command == "hint":
         from .hints import command as hint_command
