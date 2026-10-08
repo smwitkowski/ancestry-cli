@@ -185,3 +185,19 @@ def test_potential_parent_review_projection():
     assert out["source_tree_family"] == {"parents": ["John Ryan"], "spouses": ["Ellen"], "children": ["Pat Ryan"], "siblings": []}
     living = hints.parse_review({"Info": {"Name": "Jo Doe", "Birth": {"Date": "1990"}}}, "mother", {"HintId": "1", "SourceGid": "1:1030:2"})
     assert living["possibly_living"] and living["name"] is None
+
+
+def test_children_arrive_as_a_list_of_lists():
+    from ancestry_cli import discovery
+    assert discovery._flatten_members([[{"Id": 1}, {"Id": 2}], [{"Id": 3}]]) == [{"Id": 1}, {"Id": 2}, {"Id": 3}]
+    assert discovery._flatten_members([{"Id": 9}]) == [{"Id": 9}]
+
+
+def test_son_and_daughter_use_the_sites_child_type_with_a_parent_set():
+    from ancestry_cli import ops
+    b = ops.build("relative-add", tree_id=5, person_id=7, relation="Son", status="Deceased", name_id="1", gender_id="2", father_id="9",
+                  mother_id="7", actor="g")["body"]
+    assert b["type"] == "Child" and b["values"]["genderRadio"] == "Male" and b["values"]["parentSet"] == {"fatherId": "9", "motherId": "7"}
+    b = ops.build("relative-add", tree_id=5, person_id=7, relation="Sister", status="Living", name_id="1", gender_id="2", father_id="",
+                  mother_id="3", actor="g")["body"]
+    assert b["type"] == "Sister" and b["values"]["genderRadio"] == "Female" and b["values"]["parentSet"] == {"fatherId": "", "motherId": "3"}

@@ -104,6 +104,37 @@ def _anchor_ids(text):
     return name.group(1), gender.group(1)
 
 
+def _anchor_gender(page_text):
+    """Female / Male from the person's own Gender fact (the add form sends it back)."""
+    try:
+        pr = person_data(page_text)["person"]["PersonResearch"]
+        return next((f.get("Value") for f in pr.get("PersonFacts", []) if f.get("Type") == 44 and f.get("Value") in ("Female", "Male")), "")
+    except Exception:
+        return ""
+
+
+def _parent_set(w, fields):
+    """(fatherId, motherId) for a new child or sibling, as the site's own form chooses them."""
+    pr = person_data(w.page_text)["person"]["PersonResearch"]
+    family = pr.get("PersonFamily") or {}
+    ids = lambda key: [str(x["Id"]) for x in family.get(key) or [] if isinstance(x, dict) and x.get("Id")]
+    if fields["relation"] in ("Brother", "Sister"):
+        fathers, mothers = ids("Fathers"), ids("Mothers")
+        return (fathers[0] if fathers else ""), (mothers[0] if mothers else "")
+    spouses = ids("Spouses")
+    other = str(fields.get("other_parent") or "")
+    if other == "unknown":
+        other = ""
+    elif not other:
+        if len(spouses) > 1:
+            raise WriteRequestError("invalid-write-request", [{"field": "other_parent", "issue": "missing", "valid_values": spouses + ["unknown"]}])
+        other = spouses[0] if spouses else ""
+    elif other not in spouses:
+        raise WriteRequestError("invalid-write-request", [{"field": "other_parent", "issue": "invalid", "valid_values": spouses + ["unknown"]}])
+    me = str(w.person_id)
+    return (me, other) if fields.get("anchor_gender") == "Male" else (other, me)
+
+
 def _read_note(w):
     url = f"{_BASE}/family-tree/person/workspace/user/{w.actor}/tree/{w.tree_id}/person/{w.person_id}/getpersonnotes"
     resp = w.inner.get(url, timeout=30, allow_redirects=False, writes_ok=False)
@@ -186,10 +217,13 @@ def _prepare(w, fields):
         fields["name"] = w.before["name"]                  # read from the page, not stored anywhere
     elif w.op == "relative-add":
         path = f"/family-tree/person/addedit/user/{w.actor}/tree/{w.tree_id}/person/{w.person_id}/add"
-        got = w.inner.request("GET", _BASE + path, params={"rel": fields["relation"].lower()}, timeout=30, allow_redirects=False,
+        rel = {"Son": "child", "Daughter": "child"}.get(fields["relation"], fields["relation"].lower())
+        got = w.inner.request("GET", _BASE + path, params={"rel": rel}, timeout=30, allow_redirects=False,
                               _validated_endpoint={"method": "GET", "path": path, "side_effect": False})
         fields["name_id"], fields["gender_id"] = _anchor_ids(got.text)
-        fields.setdefault("anchor_gender", "")
+        fields.setdefault("anchor_gender", _anchor_gender(w.page_text))
+        if fields["relation"] in ("Son", "Daughter", "Brother", "Sister"):
+            fields["father_id"], fields["mother_id"] = _parent_set(w, fields)
     elif w.op == "source-delete":
         _check_source_title(w, fields)
     elif w.op == "source-edit":

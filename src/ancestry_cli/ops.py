@@ -148,26 +148,37 @@ def _fact_remove(c, f):
 
 # ---------------------------------------------------------------------------------------------------- people
 @operation("relative-add", summary="Create a new person and link them to this person as a relative.", risk=STRUCTURAL,
-           required=("relation", "status"), optional=("given", "surname", "suffix", "gender"),
+           required=("relation", "status"), optional=("given", "surname", "suffix", "gender", "other_parent"),
            choices={"relation": _RELATIONS, "status": ("Living", "Deceased"), "gender": ("Male", "Female", "Unknown")},
            undo="journal undo removes the new person",
            example="--set relation=Father --set given=John --set surname=Doe --set gender=Male --set status=Deceased",
            notes="relation: Father, Mother, Spouse (verified), Son, Daughter, Brother, Sister (same route, unverified). "
                  "status is Living or Deceased and has no default: a wrong guess could expose a living person. "
+                 "Son and Daughter add a child of this person; other_parent is the child's other parent (a person id from `ancestry person`'s spouses, "
+                 "or `unknown`), needed only when there is more than one spouse. Brother and Sister are placed under this person's own parents. "
                  "Always creates a NEW person; use relative-link for someone already in the tree.",
            success=lambda d: isinstance(d, dict) and bool(d.get("newPid")))
 def _relative_add(c, f):
     _need(f.get("relation") in _RELATIONS and f.get("name_id") and f.get("gender_id") and f.get("status") in ("Living", "Deceased"))
     # nameId/genderId are issued by the server (GET .../add?rel=<relation>); the sender fetches them before this runs
+    relation = f["relation"]
+    values = {"": "", "radioTab": "New person", "fname": f.get("given", ""), "lname": f.get("surname", ""),
+              "sufname": f.get("suffix", ""), "genderRadio": f.get("gender", ""), "statusRadio": f["status"],
+              "bdate": "", "bplace": "", "ddate": "", "dplace": "", "isAlternateParent": False,
+              "nameId": str(f["name_id"]), "genderId": str(f["gender_id"])}
+    kind = relation
+    if relation in ("Son", "Daughter"):               # the site's own type is Child, with the sex in genderRadio and the parents in parentSet
+        kind, values["genderRadio"] = "Child", "Male" if relation == "Son" else "Female"
+    if relation in ("Son", "Daughter", "Brother", "Sister"):
+        if relation in ("Brother", "Sister"):
+            values["genderRadio"] = "Male" if relation == "Brother" else "Female"
+        _need("father_id" in f and "mother_id" in f, "parents", "missing")      # filled in by the sender from the page
+        values["parentSet"] = {"fatherId": str(f["father_id"]), "motherId": str(f["mother_id"])}
     return dict(method="POST", path=f"{_PREFIX}/addedit/user/{c.actor}/{c.person}/addperson",
                 body={"addTarget": None,
                       "person": {"personId": str(c.person_id), "treeId": str(c.tree_id), "userId": c.actor,
                                  "gender": f.get("anchor_gender", "")},
-                      "type": f["relation"],
-                      "values": {"": "", "radioTab": "New person", "fname": f.get("given", ""), "lname": f.get("surname", ""),
-                                 "sufname": f.get("suffix", ""), "genderRadio": f.get("gender", ""), "statusRadio": f["status"],
-                                 "bdate": "", "bplace": "", "ddate": "", "dplace": "", "isAlternateParent": False,
-                                 "nameId": str(f["name_id"]), "genderId": str(f["gender_id"])}})
+                      "type": kind, "values": values})
 
 
 @operation("relative-link", summary="Link a person who is already in the tree as a relative of this person.", risk=STRUCTURAL,
@@ -506,7 +517,7 @@ def _write(*, op, tree_id, person_id, dry_run, confirm_tree, force, **fields):
         return send(op=op, tree_id=tree_id, person_id=person_id, req_hash=req_hash, **fields)
     # dry-run: fill what the live sender reads from the page, so the request shape can be shown
     placeholders = {"person-remove": {"name": "<read from the page>"}, "fact-edit": {"eventType": "<current value>"},
-                    "relative-add": {"name_id": "0", "gender_id": "0"}}.get(op, {})
+                    "relative-add": {"name_id": "0", "gender_id": "0", "father_id": "0", "mother_id": "0"}}.get(op, {})
     fields = {**fields, **{k: v for k, v in placeholders.items() if not fields.get(k)}}
     try:
         req = build(op, tree_id=tree_id, person_id=person_id, **fields)

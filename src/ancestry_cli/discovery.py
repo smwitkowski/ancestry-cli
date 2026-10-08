@@ -134,6 +134,14 @@ def find_complete(*, tree_id, given=None, surname=None, birth=None, death=None, 
     return guarded(run)
 
 
+def _flatten_members(members):
+    """Children arrive as a list of lists (one list per union); the others are flat lists."""
+    out = []
+    for m in members:
+        out.extend(m if isinstance(m, list) else [m])
+    return out
+
+
 def person(*, tree_id, person_id, include_living=False):
     def run():
         from .snapshots import person_data, snapshot_from_page
@@ -152,8 +160,8 @@ def person(*, tree_id, person_id, include_living=False):
         if living and not include_living:
             return {**base, "name": _REDACTED, "redacted": True}
         family = {}
-        for role in ("Fathers", "Mothers", "Spouses", "Siblings", "Children"):
-            members = (pr.get("PersonFamily") or {}).get(role) or []
+        for role in ("Fathers", "Mothers", "Spouses", "Siblings", "HalfSiblings", "Children"):
+            members = _flatten_members((pr.get("PersonFamily") or {}).get(role) or [])
             family[role.lower()] = [{"person_id": str(m.get("Id")), "name": _REDACTED if m.get("IsLiving") and not include_living else m.get("FullName"),
                                      "life_range": None if m.get("IsLiving") and not include_living else m.get("LifeRange")}
                                     for m in members if isinstance(m, dict)]

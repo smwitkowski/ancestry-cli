@@ -91,9 +91,9 @@ Create a new person and link them to this person as a relative.
 
 - **Risk:** structural
 - **Required:** `relation`, `status`
-- **Optional:** `given`, `surname`, `suffix`, `gender`
+- **Optional:** `given`, `surname`, `suffix`, `gender`, `other_parent`
 - **Undo:** journal undo removes the new person
-- **Notes:** relation: Father, Mother, Spouse (verified), Son, Daughter, Brother, Sister (same route, unverified). status is Living or Deceased and has no default: a wrong guess could expose a living person. Always creates a NEW person; use relative-link for someone already in the tree.
+- **Notes:** relation: Father, Mother, Spouse (verified), Son, Daughter, Brother, Sister (same route, unverified). status is Living or Deceased and has no default: a wrong guess could expose a living person. Son and Daughter add a child of this person; other_parent is the child's other parent (a person id from `ancestry person`'s spouses, or `unknown`), needed only when there is more than one spouse. Brother and Sister are placed under this person's own parents. Always creates a NEW person; use relative-link for someone already in the tree.
 
 ```bash
 ancestry write relative-add --tree TREE --person PERSON --set relation=Father --set given=John --set surname=Doe --set gender=Male --set status=Deceased --confirm-tree TREE --live
