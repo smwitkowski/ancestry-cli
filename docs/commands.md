@@ -119,6 +119,14 @@ child who sits in a "father and unknown spouse" family MOVES them into the known
 people: from P's side, `W`/`H` when Q is P's wife/husband, `F`/`M` (with the same `parent_type`) when Q is P's father/mother, `C` when Q is
 P's child. It needs explicit approval for real trees; the journal does not undo it (re-link with `relative-link`).
 
+Work-finding and hints:
+- `ancestry hint list` now returns, per hint, `kind` (record or tree), `title`, `category`, `match_score`, `new_facts`, `new_family_members`, `ai_extracted` and a short `summary` of what the card shows.
+- `ancestry scan --tree T [--missing-parent] [--with-hints] [--max-people N]` lists every person with `has_father`/`has_mother`; `--with-hints` adds pending hint counts (one read per listed person) and keeps only people with hints, most first.
+- `ancestry hint batch --tree T --person P --op hint-no|hint-maybe|hint-new|hint-ignore|hint-restore|accept --hint-ids a,b,c [--confirm-tree T --live]`: one dry-run or confirmation, a result and journal row per hint, then `still_listed` as the read-back. It stops at the first failure.
+- `ancestry hint parent-accept --tree T --person P --hint-id H [--confirm-tree T --live]` accepts a suggested father or mother. It CREATES a new person from the other tree's copy (it never merges) and refuses when the slot is already filled. Dry-run verified; the live path follows the web app's own request but has not yet been run against a real suggestion.
+- `ancestry journal summary [--since 2026-10-09] [--names] [--tree T]`: writes grouped by op and person, new people, removals and detaches, failed and unknown outcomes.
+- `ancestry person` also returns `duplicate_facts` (a one-per-life fact twice, or any fact twice on one date). Reporting only.
+
 ### `ancestry read hints --tree T --person P`, `ancestry read record --collection C --record R`
 Hints page data and a record's details. **Take record and collection ids from a live search result**, not from examples.
 ### `ancestry read list [GROUP]` / `ancestry read get NAME [--tree T --person P --path k=v --param k=v] [--full]`

@@ -28,8 +28,37 @@ _BASE = "https://www.ancestry.com"
 _EVAL = re.compile(r"hintsui-eval/(1\.0\.0-[0-9a-z]+)/")      # the web app's deploy version; it changes, so it is read each time
 
 
+_BOILER = ("Compare details", "In this record", "Status", "In your tree")
+
+
+def _card_text(card):
+    text = re.sub(r"<[^>]+>", "|", card)
+    parts = []
+    for piece in (x.strip() for x in text.split("|")):
+        if piece and piece not in ("New", "-") and (not parts or parts[-1] != piece):
+            parts.append(piece)
+    return parts
+
+
+def _card_fields(card):
+    """What one hint card says: kind, title, category, record, Ancestry's score, what it would add and a short summary."""
+    attr = lambda name: (re.search(rf'data-{name}="([^"]*)"', card) or [None, None])[1]
+    ube = re.search(r'data-ube="(\{.*?\})"', card)
+    ube = json.loads(ube.group(1)) if ube else {}
+    title = re.search(r'class="[^"]*hintTitle[^"]*">(.*?)</h2>', card, re.DOTALL)
+    title = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", title.group(1))).strip() if title else None
+    parts = _card_text(card)
+    cut = next((i for i, x in enumerate(parts) if x in ("Review", "Ignore")), len(parts))
+    body = [x for x in parts[:cut] if x != title and x != attr("databasecategory")]
+    return {"kind": "record" if attr("objectid") else "tree", "title": title, "category": attr("databasecategory"),
+            "match_score": ube.get("matchScore"), "new_facts": ube.get("numberOfNewAssertions"),
+            "new_family_members": ube.get("numberOfNewFamilyMembers"),
+            "ai_extracted": any("artificial intelligence" in x for x in parts),
+            "summary": " | ".join(x for x in body if "artificial intelligence" not in x and x != "Learn more" and x not in _BOILER)[:300] or None}
+
+
 def parse_hints(body):
-    """The hints on a person's page, in page order: [{hint_id, record_id, collection_id}] (record_id None if not a record)."""
+    """The hints on a person's page, in page order: hint_id, record_id, collection_id (None if not a record) and the card's content."""
     text = html.unescape(body)
     ids, starts = [], []
     for m in re.finditer(r'"HintId"\s*:\s*"(\d{8,})"|hintId=(\d{8,})', text):
@@ -38,10 +67,18 @@ def parse_hints(body):
             ids.append(hint_id)
             starts.append(m.start())
     starts.append(len(text))
+    cards = {}
+    for card in re.split(r'(?=<section class="hintCard)', text)[1:]:
+        hid = re.search(r'data-hintId="(\d+)"', card)
+        if hid:
+            cards[hid.group(1)] = card
     out = []
     for i, hint_id in enumerate(ids):
         gid = re.search(r"recordGid[\"']?\s*[:=]\s*[\"']?(\d+):(\d+)", text[starts[i]:starts[i + 1]])
-        out.append({"hint_id": hint_id, "record_id": gid.group(1) if gid else None, "collection_id": gid.group(2) if gid else None})
+        row = {"hint_id": hint_id, "record_id": gid.group(1) if gid else None, "collection_id": gid.group(2) if gid else None}
+        if hint_id in cards:
+            row.update(_card_fields(cards[hint_id]))
+        out.append(row)
     return out
 
 
@@ -68,9 +105,15 @@ class _Accept:
     preview: dict = None
     sent: bool = False
 
+    source_override: str = None
+
     @property
     def source_gid(self):
-        return f"{self.record_id}:{self.collection_id}"
+        return self.source_override or f"{self.record_id}:{self.collection_id}"
+
+    @source_gid.setter
+    def source_gid(self, value):
+        self.source_override = value
 
     @property
     def person_gid(self):
@@ -185,14 +228,65 @@ def _wait_for_job(a, location, poll_seconds):
     return state
 
 
-def _journal(a, outcome, req_hash=None):
+def _journal(a, outcome, req_hash=None, op="hint-accept"):
     """Append the journal row; returns its id (None if it could not be written). Never raises."""
     try:
         from .journal import record
         ids = {"hintId": a.hint_id, "recordId": a.record_id, "collectionId": a.collection_id}
-        return record("hint-accept", a.tree_id, a.person_id, {"hint_id": a.hint_id}, ids, outcome, req_hash=req_hash)
+        return record(op, a.tree_id, a.person_id, {"hint_id": a.hint_id}, ids, outcome, req_hash=req_hash)
     except Exception:
         return None
+
+
+def _accept_parent(a, dry_run, poll_seconds, req_hash, include_living):
+    """Accept a suggested parent: Ancestry copies the other tree's person into this tree and links them as the father or mother.
+    This CREATES a new person (it never merges into an existing one); the result reports the new id when Ancestry names it."""
+    from .discovery import person as read_person
+    from .snapshots import person_data
+    inner, tree_id, person_id, hint_id, evalv = a.inner, a.tree_id, a.person_id, a.hint_id, a.evalv
+    page = inner.get(f"{_BASE}/family-tree/person/tree/{tree_id}/person/{person_id}/facts", timeout=60, allow_redirects=False, writes_ok=False)
+    pr = person_data(page.text)["person"]["PersonResearch"]
+    raw = pr.get("NewPersonHints") or (pr.get("NewPersonHintsData") or {}).get("hints") or []
+    hint = next((h for h in raw if str(h.get("HintId")) == hint_id), None)
+    role = str((hint or {}).get("Role") or "").lower()
+    if hint is None or role not in ("father", "mother") or not hint.get("SourceGid"):
+        return failure("hint-not-found-or-not-a-parent")
+    slot = (pr.get("PersonFamily") or {}).get("Fathers" if role == "father" else "Mothers") or []
+    if any(m for m in _flatten(slot)):
+        return failure("parent-slot-occupied", role=role)
+    a.source_gid = str(hint["SourceGid"])               # shadows the record-based property for this flow
+    shown = parse_review(json.loads(inner.get(f"{_BASE}/api/hintsui-api/person/{person_id}:1030:{tree_id}/review/{a.source_gid}",
+                                             params={"evalV": evalv}, headers=_headers(tree_id, person_id), timeout=60,
+                                             allow_redirects=False, writes_ok=False).text), role, hint, include_living)
+    preview = {"relation": role, "suggested": {k: shown.get(k) for k in ("name", "birth", "death", "source_tree_family")}}
+    if dry_run:
+        return {"ok": True, "classification": "dry-run", "dispatch_attempted": False, "state": "unchanged", "preview": preview}
+    body = {"hintId": hint_id, "relation": role, "personGid": a.person_gid, "sourcePersonGid": a.source_gid, "parents": {}}
+    a.lease.check()
+    a.sent = True
+    upload = json.loads(_post(a, "upload/nph", body).text)
+    state = _wait_for_job(a, upload.get("location"), poll_seconds)
+    if state.get("pending") or not state.get("success"):
+        return failure("merge-job-failed", dispatched=True, preview=preview, journal_id=_journal(a, "unknown", req_hash, "hint-parent-accept"),
+                       progress={"done": ["upload"], "failed_at": "status"})
+    payload = upload.get("postConfirmationPayload") or merge_payload._build_confirmation_body(
+        hint_id=hint_id, person_gid=a.person_gid, source_gid=a.source_gid)["postConfirmationPayload"]
+    ok = bool(json.loads(_post(a, "post/confirmation", {"postConfirmationPayload": payload}).text).get("success"))
+    journal_id = _journal(a, "ok" if ok else "unknown", req_hash, "hint-parent-accept")
+    if not ok:
+        return failure("confirmation-failed", dispatched=True, preview=preview, journal_id=journal_id,
+                       progress={"done": ["upload", "status"], "failed_at": "confirmation"})
+    after = read_person(tree_id=tree_id, person_id=person_id, include_living=True)
+    added = (after.get("family") or {}).get("fathers" if role == "father" else "mothers") or []
+    return {"ok": True, "classification": "accepted-parent", "dispatch_attempted": True, "state": "changed", "preview": preview,
+            "created_new_person": True, "parent_now": added, "journal_id": journal_id}
+
+
+def _flatten(slot):
+    out = []
+    for m in slot:
+        out.extend(m if isinstance(m, list) else [m])
+    return out
 
 
 def _commit(a, poll_seconds, req_hash):
@@ -215,16 +309,48 @@ def _commit(a, poll_seconds, req_hash):
             "journal_id": journal_id}
 
 
-def _guards(tree_id, person_id, hint_id, cite_only, confirm_tree, force):
+def _guards(tree_id, person_id, hint_id, cite_only, confirm_tree, force, op="hint-accept"):
     """The live-write guards. Returns (failure result or None, request hash)."""
     from .journal import find_duplicate, request_hash
     if not config.writable(tree_id):
         return failure("tree-not-writable"), None
     if config.needs_confirmation(tree_id, confirm_tree):
         return failure("confirm-tree-required"), None
-    req_hash = request_hash("hint-accept", tree_id, person_id, {"hint_id": hint_id, "cite_only": cite_only})
+    req_hash = request_hash(op, tree_id, person_id, {"hint_id": hint_id, "cite_only": cite_only})
     duplicate = None if force else find_duplicate(req_hash)
     return (failure("duplicate-write", journal_id=duplicate) if duplicate is not None else None), req_hash
+
+
+_BATCH_OPS = ("hint-no", "hint-maybe", "hint-new", "hint-ignore", "hint-restore", "accept")
+
+
+def batch(*, op, tree_id, person_id, hint_ids, cite_only=False, dry_run=True, confirm_tree=None, force=False):
+    """The same change for several hints of one person: one dry-run or one confirmation, one result and one journal row per hint,
+    then a read-back of the person's hint list (`still_listed` = hints that are still pending afterwards)."""
+    ids = [h for h in dict.fromkeys(str(x).strip() for x in (hint_ids or [])) if h]
+    if op not in _BATCH_OPS or not ids or len(ids) > 50:
+        return failure("invalid-write-request", problems=[{"field": "op" if op not in _BATCH_OPS else "hint_ids", "issue": "invalid",
+                                                           "valid_values": list(_BATCH_OPS) if op not in _BATCH_OPS else "1 to 50 hint ids"}])
+    from .ops import write
+    results = []
+    for hid in ids:
+        if op == "accept":
+            r = command(action="accept", tree_id=tree_id, person_id=person_id, hint_id=hid, cite_only=cite_only, dry_run=dry_run,
+                        confirm_tree=confirm_tree, force=force)
+        else:
+            r = write(op=op, tree_id=tree_id, person_id=person_id, dry_run=dry_run, confirm_tree=confirm_tree, force=force, hint_id=hid)
+        results.append({"hint_id": hid, "ok": r.get("ok"), "classification": r.get("classification"), "journal_id": r.get("journal_id")})
+        if not r.get("ok") and not dry_run:
+            break           # stop at the first failure: the rest were not attempted
+    out = {"ok": all(r["ok"] for r in results) and len(results) == len(ids), "classification": "hint-batch-dry-run" if dry_run else "hint-batch",
+           "op": op, "tree_id": str(tree_id), "person_id": str(person_id), "requested": len(ids), "attempted": len(results), "results": results}
+    if not dry_run:
+        out["state"] = "changed" if any(r["ok"] for r in results) else "unchanged"
+        back = command(action="list", tree_id=tree_id, person_id=person_id)
+        if back.get("ok"):
+            pending = {h["hint_id"] for h in back["hints"]}
+            out["still_listed"] = [h for h in ids if h in pending]
+    return out
 
 
 def command(*, action, tree_id, person_id, hint_id=None, cite_only=False, dry_run=True, bridge=None, poll_seconds=30,
@@ -233,11 +359,11 @@ def command(*, action, tree_id, person_id, hint_id=None, cite_only=False, dry_ru
     if type(tree_id) is not int or type(person_id) is not int or not config.tree_allowed(tree_id):
         return failure("configuration-error")
     hint_id = str(hint_id) if hint_id else None
-    if action == "accept" and not hint_id:
+    if action in ("accept", "parent-accept") and not hint_id:
         return failure("hint-id-required")
     req_hash = None
-    if action == "accept" and not dry_run:
-        refusal, req_hash = _guards(tree_id, person_id, hint_id, cite_only, confirm_tree, force)
+    if action in ("accept", "parent-accept") and not dry_run:
+        refusal, req_hash = _guards(tree_id, person_id, hint_id, cite_only, confirm_tree, force, "hint-parent-accept" if action == "parent-accept" else "hint-accept")
         if refusal:
             return refusal
     accept = None
@@ -249,6 +375,12 @@ def command(*, action, tree_id, person_id, hint_id=None, cite_only=False, dry_ru
             hints, data = _person_hints(inner, tree_id, person_id)
             if action == "list":
                 return {"ok": True, "classification": "hints", "hints": hints}
+            if action == "parent-accept":
+                evalv = _EVAL.search(json.dumps(data))
+                if not evalv:
+                    return failure("eval-version-unresolved")
+                accept = _Accept(inner, lease, tree_id, person_id, hint_id, "", "", evalv.group(1), False)
+                return _accept_parent(accept, dry_run, poll_seconds, req_hash, include_living)
             if action == "parents":
                 evalv = _EVAL.search(json.dumps(data))
                 if not evalv:
@@ -256,7 +388,7 @@ def command(*, action, tree_id, person_id, hint_id=None, cite_only=False, dry_ru
                 found = _parents(inner, tree_id, person_id, evalv.group(1), include_living)
                 return {"ok": True, "classification": "potential-parents", "dispatch_attempted": True, "state": "unchanged",
                         "tree_id": str(tree_id), "person_id": str(person_id), "count": len(found), "suggestions": found,
-                        "note": "Accepting a suggested parent is not built: no capture of the accept request exists yet."}
+                        "note": "Accept one with `hint parent-accept --hint-id H` (creates a new person; explicit approval)."}
             chosen = next((h for h in hints if h["hint_id"] == hint_id), None)
             if not chosen or not chosen["record_id"]:
                 return failure("hint-not-found-or-not-a-record")

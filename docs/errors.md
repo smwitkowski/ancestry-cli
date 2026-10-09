@@ -68,7 +68,7 @@ Exit codes: `0` ok, `1` failed with nothing changed, `2` bad usage, `3` state un
 | `findagrave-search-not-allowed` | no | no | Find a Grave's robots.txt disallows automated memorial search, so this tool does not search. Find the memorial id in your browser or from a citation, then use `findagrave memorial ID`. |  |
 | `findagrave-check-required` | no | no | Find a Grave refused the request (403 or a bot check). It has been seen to refuse Python builds with an old OpenSSL (openssl in this result; 3.6 works, 3.0 does not): `uv tool install --force --reinstall --python 3.13 .` uses a newer one. Otherwise use the site in your own browser; do not retry in a loop. |  |
 | `findagrave-rate-limited` | yes | no | Find a Grave is rate-limiting. Wait a few minutes, then retry. | retry: retry the same command |
-| `findagrave-not-found` | no | no | No such memorial or photo. Check the memorial id. | edit-args: Check the id. |
+| `findagrave-not-found` | no | no | No such memorial or photo. `findagrave photo` takes the MEMORIAL id, not a photo id: list the photo ids with `findagrave memorial ID --photos`, then pick one with --n. | edit-args: Check the id. |
 | `findagrave-unavailable` | yes | no | Find a Grave did not answer (see status). Retry once later. | retry: retry the same command |
 | `newspapers-check-required` | no | no | This archive is behind a bot check that plain HTTP cannot pass, and the tool does not try to. Use that site in your own browser. |  |
 | `newspapers-sign-in-required` | no | yes | The Newspapers.com tab is not signed in. Sign in by hand (Ancestry sign-in works), then retry. | human: Sign in to Newspapers.com in its tab. |
@@ -92,6 +92,9 @@ Exit codes: `0` ok, `1` failed with nothing changed, `2` bad usage, `3` state un
 | `unknown-tag` | no | no | Unknown tag name. Use a listed tag name or its numeric id. | edit-args: Use a tag name from `did_you_mean`, or a numeric tag id. |
 | `live-not-admitted` | no | no | That operation cannot be sent live. | run: `ancestry ops` |
 | `hint-id-required` | no | no | Pass --hint-id (see `ancestry hint list`). | run: `ancestry hint list --tree {tree_id} --person {person_id}` |
+| `hint-not-found-or-not-a-parent` | no | no | That hint is not a suggested father or mother of this person. List them with `ancestry hint parents`. | run: `ancestry hint parents --tree {tree_id} --person {person_id}` |
+| `familysearch-collection-not-numeric` | no | no | Record search filters by a NUMERIC collection id. Ids like M9J1-SZ4 (from `familysearch fulltext`) name a full-text collection and only work with `fulltext --collection`. | edit-args: Use a numeric id, or run the same words with `familysearch fulltext --collection`. |
+| `parent-slot-occupied` | no | no | The person already has a parent in that slot. Nothing was sent; link or compare by hand if the suggestion is a better match. | edit-args: Review the existing parent first. |
 | `hint-not-found-or-not-a-record` | no | no | That hint is not among the person's new hints, or it has no record. List them with `ancestry hint list`. | run: `ancestry hint list --tree {tree_id} --person {person_id}` |
 | `missing-arguments` | no | no | Required options for this read are missing. See `ancestry read --help`. | edit-args: Provide the required options for this read. |
 | `missing-path-param` | no | no | This endpoint needs a path value (see `missing`); pass it with --path key=value. | edit-args: Add --path {missing}=<value>. |

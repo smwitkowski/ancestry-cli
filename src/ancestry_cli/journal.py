@@ -141,7 +141,7 @@ def manual():
     done = {r["undo_of"] for r in rows if "undo_of" in r} | {r["resolved"] for r in rows if "resolved" in r}
     return [r for r in rows if "undo_of" not in r and "resolved" not in r and r["id"] not in done and not r.get("undo")
             and (r.get("outcome") == "unknown" or (r.get("outcome", "ok") == "ok"
-                 and r["op"] in ("source-create", "citation-add", "hint-accept")))]
+                 and r["op"] in ("source-create", "citation-add", "hint-accept", "hint-parent-accept")))]
 
 
 def outstanding():
@@ -150,8 +150,39 @@ def outstanding():
     return [r for r in _rows() if "undo_of" not in r and r.get("undo") and r["id"] not in done]
 
 
-def command(*, action, entry_id=None, dry_run=True, all_entries=False, resolve_as=None):
+def summary(*, since=None, names=False, tree_id=None):
+    """What the journal recorded since a time (ISO date or datetime, UTC), grouped by person and op. names=True looks each person up."""
+    rows = [r for r in _rows() if r.get("op") and (not since or r["ts"] >= since) and (tree_id is None or str(r["tree_id"]) == str(tree_id))]
+    by_op, people, new_people = {}, {}, []
+    for r in rows:
+        by_op[r["op"]] = by_op.get(r["op"], 0) + 1
+        entry = people.setdefault((str(r["tree_id"]), str(r["person_id"])), {"tree_id": str(r["tree_id"]), "person_id": str(r["person_id"]), "ops": {}, "journal_ids": []})
+        entry["ops"][r["op"]] = entry["ops"].get(r["op"], 0) + 1
+        entry["journal_ids"].append(r["id"])
+        if r["op"] == "relative-add" and r.get("outcome", "ok") == "ok" and (r.get("ids") or {}).get("newPid"):
+            new_people.append({"journal_id": r["id"], "tree_id": str(r["tree_id"]), "person_id": str(r["ids"]["newPid"]), "added_to": str(r["person_id"])})
+    out = {"ok": True, "classification": "journal-summary", "since": since, "writes": len(rows), "by_op": by_op,
+           "failed": [r["id"] for r in rows if r.get("outcome") == "failed"],
+           "unknown_outcomes": [r["id"] for r in rows if r.get("outcome") == "unknown"],
+           "detaches_and_removals": [{"journal_id": r["id"], "op": r["op"], "person_id": str(r["person_id"])} for r in rows
+                                     if r["op"] in ("fact-detach-source", "fact-remove", "citation-remove", "person-remove", "relationship-remove", "weblink-remove", "tag-remove", "media-remove")],
+           "new_people": new_people, "people": sorted(people.values(), key=lambda e: e["journal_ids"][0])}
+    if names:
+        from .discovery import person
+        cache = {}
+        for entry in out["people"] + [{"tree_id": n["tree_id"], "person_id": n["person_id"], "_n": n} for n in new_people]:
+            key = (entry["tree_id"], entry["person_id"])
+            if key not in cache:
+                got = person(tree_id=int(key[0]), person_id=int(key[1]))
+                cache[key] = got.get("name") if got.get("ok") else None
+            (entry.get("_n") or entry)["name"] = cache[key]
+    return out
+
+
+def command(*, action, entry_id=None, dry_run=True, all_entries=False, resolve_as=None, since=None, names=False, tree_id=None):
     """list: outstanding creations (ids only). undo: run (or dry-run) the inverse of one or all."""
+    if action == "summary":
+        return summary(since=since, names=names, tree_id=tree_id)
     if action in ("resolve", "verify"):
         row = next((r for r in _rows() if r.get("id") == entry_id), None) if entry_id is not None else None
         if row is None:

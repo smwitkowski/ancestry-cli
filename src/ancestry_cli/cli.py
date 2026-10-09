@@ -89,6 +89,13 @@ def build_parser():
     p.add_argument("--include-living", action="store_true", help="do not redact people who may be living")
     p.add_argument("--complete", action="store_true", help="use the tree's full search (every page): no result means not in the tree")
 
+    p = subs.add_parser("scan", help="every person in a tree with parent slots (and hint counts): find the work in one call", allow_abbrev=False)
+    _tree_arg(p, True)
+    p.add_argument("--missing-parent", action="store_true", help="only people with no father or no mother recorded")
+    p.add_argument("--with-hints", action="store_true", help="add each listed person's pending hint count and keep only those with hints (one read per person)")
+    p.add_argument("--max-people", type=int, default=500)
+    p.add_argument("--include-living", action="store_true")
+
     p = subs.add_parser("person", help="facts, sources and family of one person", allow_abbrev=False)
     _tree_arg(p, True)
     p.add_argument("--person", dest="person_id", required=True, type=int)
@@ -165,10 +172,12 @@ def build_parser():
     p.add_argument("--live", action="store_true", help="send for real (default: validate only)")
 
     p = subs.add_parser("hint", help="list a person's hints or accept one", allow_abbrev=False)
-    p.add_argument("action", choices=("list", "accept", "parents"))
+    p.add_argument("action", choices=("list", "accept", "parents", "batch", "parent-accept"))
     _tree_arg(p, True)
     p.add_argument("--person", dest="person_id", required=True, type=int)
     p.add_argument("--hint-id")
+    p.add_argument("--hint-ids", help="batch: comma-separated hint ids (up to 50)")
+    p.add_argument("--op", help="batch: hint-no, hint-maybe, hint-new, hint-ignore, hint-restore or accept")
     p.add_argument("--include-living", action="store_true", help="parents: do not redact a suggestion who may be living")
     p.add_argument("--cite-only", action="store_true")
     p.add_argument("--confirm-tree", dest="confirm_tree", type=_tree)
@@ -176,10 +185,13 @@ def build_parser():
     _modes(p)
 
     p = subs.add_parser("journal", help="list what was created, undo it, or settle an unknown outcome", allow_abbrev=False)
-    p.add_argument("action", choices=("list", "undo", "verify", "resolve"))
+    p.add_argument("action", choices=("list", "undo", "verify", "resolve", "summary"))
     p.add_argument("--id", dest="entry_id", type=int)
     p.add_argument("--all", dest="all_entries", action="store_true")
     p.add_argument("--as", dest="resolve_as", choices=("ok", "failed"), help="for `resolve`: did the change happen?")
+    p.add_argument("--since", help="for `summary`: only writes at or after this UTC time, e.g. 2026-10-09 or 2026-10-09T08:00")
+    p.add_argument("--names", action="store_true", help="for `summary`: look up each person's name (one read per person)")
+    p.add_argument("--tree", dest="tree_id", help="for `summary`: only this tree id")
     _modes(p)
     return parser
 
@@ -288,6 +300,9 @@ def _run(command, args):
     if command == "find":
         from .discovery import find, find_complete
         return (find_complete if args.pop("complete") else find)(**{k: v for k, v in args.items() if k != "complete"})
+    if command == "scan":
+        from .discovery import scan
+        return scan(**args)
     if command == "person":
         from .discovery import person
         return person(**args)
@@ -316,7 +331,10 @@ def _run(command, args):
             args[who] = f"{(g or '').replace(' ', '+')}_{(sname or '').replace(' ', '+')}" if (g or sname) else None
         return read(**{**args, "path_params": _fields(args["path_params"]), "params": _fields(args["params"])})
     if command == "hint":
-        from .hints import command as hint_command
+        from .hints import batch, command as hint_command
+        ids, op = args.pop("hint_ids"), args.pop("op")
+        if args["action"] == "batch":
+            return batch(op=op, hint_ids=(ids or "").split(","), **{k: v for k, v in args.items() if k in ("tree_id", "person_id", "cite_only", "dry_run", "confirm_tree", "force")})
         return hint_command(**args)
     from .journal import command as journal_command  # command == "journal"
     return journal_command(**args)

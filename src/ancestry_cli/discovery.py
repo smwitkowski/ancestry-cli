@@ -97,6 +97,49 @@ def find(*, tree_id, given=None, surname=None, birth=None, death=None, limit=20,
     return guarded(run)
 
 
+def scan(*, tree_id, with_hints=False, missing_parent=False, max_people=500, include_living=False):
+    """Every person in the tree with their parent slots, and (with_hints) their pending hint count: one call finds the work.
+    missing_parent=True lists only people with no father or no mother recorded; with_hints reads one count per listed person."""
+    def run():
+        rows, page = [], 1
+        with session() as (_b, _l, inner):
+            while page <= 100 and len(rows) < max_people:
+                batch = get_json(inner, f"/api/treesui-list/trees/{tree_id}/persons",
+                                 {"page": str(page), "limit": "50", "fields": "EVENTS,NAMES,FAMILY", "isGetFullPersonObject": "true"})
+                if not isinstance(batch, list):
+                    break
+                rows += batch
+                if len(batch) < 50:
+                    break
+                page += 1
+            rows = rows[:max_people]
+            out = []
+            for r in rows:
+                family = r.get("Family") or []
+                names = r.get("Names") or [{}]
+                events = {e.get("t"): e for e in (r.get("Events") or []) if isinstance(e, dict)}
+                b = _num((events.get("Birth") or {}).get("nd") or (events.get("Birth") or {}).get("d"))
+                dth = _num((events.get("Death") or {}).get("nd") or (events.get("Death") or {}).get("d"))
+                living = bool(r.get("l")) or _possibly_living(b, dth)
+                hide = living and not include_living
+                pid = str(r["gid"]["v"]).split(":")[0]
+                out.append({"person_id": pid, "name": _REDACTED if hide else " ".join(x for x in (names[0].get("g"), names[0].get("s")) if x) or None,
+                            "birth_year": None if hide else b, "death_year": None if hide else dth, "possibly_living": living,
+                            "has_father": any(f.get("t") == "F" for f in family), "has_mother": any(f.get("t") == "M" for f in family)})
+            if missing_parent:
+                out = [p for p in out if not (p["has_father"] and p["has_mother"])]
+            if with_hints:
+                for p in out:
+                    got = get_json(inner, f"/api/treeviewer/hints/tree/{tree_id}", {"pid": p["person_id"], "pids": p["person_id"]})
+                    p["hints"] = got.get(p["person_id"]) if isinstance(got, dict) else None
+        if with_hints:
+            out = [p for p in out if (p["hints"] or 0) > 0]      # -1 is Ancestry's "none to show"
+            out.sort(key=lambda p: -p["hints"])
+        return {"ok": True, "classification": "tree-scan", "tree_id": str(tree_id), "people_read": len(rows),
+                "complete": len(rows) < max_people, "count": len(out), "people": out}
+    return guarded(run)
+
+
 def find_complete(*, tree_id, given=None, surname=None, birth=None, death=None, limit=20, include_living=False):
     """The tree's own "Find in tree" search: complete (every page is read), so no result means the name is not in the tree."""
     if not (given or surname):
@@ -142,6 +185,32 @@ def _flatten_members(members):
     return out
 
 
+_ONCE = {"Birth", "Death", "Baptism", "Christening", "Burial", "Immigration", "Emigration", "Naturalization"}
+
+
+def duplicate_facts(facts):
+    """Groups of facts that look doubled: one-per-life types that appear twice, or any type twice on the same date.
+    Reporting only; removing one is the user's call."""
+    groups = {}
+    for f in facts:
+        if f["type"] != "Name" and not str(f["type"]).startswith(("Family", "Marriage", "Divorce")):   # family events repeat per spouse or child
+            groups.setdefault(f["type"], []).append(f)
+    out = []
+    for kind, rows in groups.items():
+        if len(rows) < 2:
+            continue
+        by_date = {}
+        for f in rows:
+            by_date.setdefault(f["date"] or "", []).append(f)
+        same_date = [r for d, r in by_date.items() if d and len(r) > 1]
+        if kind in _ONCE:
+            out.append({"type": kind, "same_date": bool(same_date), "facts": [{k: f[k] for k in ("assertion_id", "date", "place", "preferred", "source_count")} for f in rows]})
+        else:
+            for r in same_date:
+                out.append({"type": kind, "same_date": True, "facts": [{k: f[k] for k in ("assertion_id", "date", "place", "preferred", "source_count")} for f in r]})
+    return out
+
+
 def person(*, tree_id, person_id, include_living=False):
     def run():
         from .snapshots import person_data, snapshot_from_page
@@ -170,7 +239,7 @@ def person(*, tree_id, person_id, include_living=False):
                   "description": f.get("Description"), "source_count": len(str(f.get("SourceCitationIDs") or "").split()),
                   "citation_ids": str(f.get("SourceCitationIDs") or "").split()}
                  for f in snap["facts"] if f.get("AssertionId")]
-        return {**base, "name": snap["name"], "facts": facts, "sources": len(snap["sources"]),
+        return {**base, "name": snap["name"], "facts": facts, "duplicate_facts": duplicate_facts(facts), "sources": len(snap["sources"]),
                 "citations": [{"citation_id": str(s["CitationId"]), "source_id": s.get("SourceId"), "custom": s.get("custom", False),
                                "title": s.get("Title"),
                                "detail": s.get("Detail"), "record_id": s.get("RecordId") or None, "url": s.get("ViewRecordUrl"),

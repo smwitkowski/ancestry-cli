@@ -246,3 +246,28 @@ def test_relationship_remove_and_child_link_bodies():
     assert b["values"]["relationModifier"] == 4 and b["values"]["reverseRelation"] == "f"
     spouse = ops.build("relative-link", tree_id=5, person_id=7, relation="Spouse", existing_person_id="9", actor="g")["body"]
     assert spouse["type"] == "Spouse" and "parentSet" not in spouse["values"]
+
+
+def test_hint_card_content_duplicate_facts_and_journal_summary(tmp_path, monkeypatch):
+    import json
+    from ancestry_cli import discovery, hints, journal
+    card = ('"HintId":"1111111111" <section class="hintCard" data-hintId="1111111111" data-databasecategory="Census &amp; Voter Lists" '
+            'data-objectid="5" data-ube="{&quot;matchScore&quot;:543,&quot;numberOfNewAssertions&quot;:2,&quot;numberOfNewFamilyMembers&quot;:0}">'
+            '<h2 class="hintTitle x"><a>1910 Census</a></h2><div>Residence</div><div>Brooklyn</div><button>Review</button></section>')
+    h, = hints.parse_hints(card)
+    assert (h["kind"], h["title"], h["match_score"], h["new_facts"], h["category"]) == ("record", "1910 Census", 543, 2, "Census & Voter Lists")
+    assert "Residence | Brooklyn" in h["summary"]
+    facts = [{"type": "Birth", "date": "1890", "place": "A", "preferred": True, "source_count": 1, "assertion_id": "1"},
+             {"type": "Birth", "date": "1891", "place": "B", "preferred": False, "source_count": 0, "assertion_id": "2"},
+             {"type": "Family Event", "date": "1940", "place": "", "preferred": True, "source_count": 0, "assertion_id": "3"},
+             {"type": "Family Event", "date": "1940", "place": "", "preferred": True, "source_count": 0, "assertion_id": "4"}]
+    dup, = discovery.duplicate_facts(facts)
+    assert dup["type"] == "Birth" and dup["same_date"] is False and len(dup["facts"]) == 2
+    monkeypatch.setenv("ANCESTRY_CLI_JOURNAL", str(tmp_path / "j.jsonl"))
+    (tmp_path / "j.jsonl").write_text("\n".join(json.dumps(r) for r in [
+        {"id": 0, "ts": "2026-10-08T01:00:00Z", "op": "fact-add", "tree_id": 1, "person_id": 9, "ids": {}, "outcome": "ok"},
+        {"id": 1, "ts": "2026-10-09T01:00:00Z", "op": "relative-add", "tree_id": 1, "person_id": 9, "ids": {"newPid": 77}, "outcome": "ok"},
+        {"id": 2, "ts": "2026-10-09T02:00:00Z", "op": "fact-detach-source", "tree_id": 1, "person_id": 9, "ids": {}, "outcome": "unknown"}]))
+    out = journal.summary(since="2026-10-09")
+    assert out["writes"] == 2 and out["new_people"][0]["person_id"] == "77" and out["unknown_outcomes"] == [2]
+    assert out["detaches_and_removals"][0]["op"] == "fact-detach-source"

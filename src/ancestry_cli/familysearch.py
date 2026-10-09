@@ -239,6 +239,8 @@ def _collection(sds):
 def search(*, surname, given=None, birth=None, death=None, marriage=None, place=None, collection=None, years=2, limit=10):
     if not (surname or given):
         return failure("missing-arguments")
+    if collection and not re.fullmatch(r"[0-9]{1,12}", str(collection)):
+        return failure("familysearch-collection-not-numeric", collection=str(collection))
     q = {"q.surname": surname}
     if given:
         q["q.givenName"] = given
@@ -248,7 +250,7 @@ def search(*, surname, given=None, birth=None, death=None, marriage=None, place=
     if place:
         q["q.anyPlace"] = place
     if collection:
-        q["q.collectionId"] = str(int(collection))
+        q["q.collectionId"] = str(collection)
     q.update({"count": str(max(1, min(int(limit), 50))), "offset": "0", "m.defaultFacets": "on",
               "m.facetNestCollectionInCategory": "on", "m.queryRequireDefault": "on"})
 
@@ -925,8 +927,9 @@ def build_parser():
     s = subs.add_parser("search", help="historical record search")
     s.add_argument("--surname", required=True)
     s.add_argument("--given")
-    for name in ("birth", "death", "marriage", "collection"):
+    for name in ("birth", "death", "marriage"):
         s.add_argument("--" + name, type=int)
+    s.add_argument("--collection", help="a collection id from an earlier result (numeric or like M9J1-SZ4)")
     s.add_argument("--place", help="any place (birth, death, residence, marriage)")
     s.add_argument("--years", type=int, default=2, help="plus or minus years around the event year (default 2)")
     s.add_argument("--limit", type=int, default=10)
