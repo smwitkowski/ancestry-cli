@@ -126,7 +126,7 @@ def record(op, tree_id, person_id, fields, ids, outcome="ok", snapshot=None, req
     row_id = len(_rows())
     _append({"id": row_id, "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "op": op,
              "tree_id": tree_id, "person_id": person_id, "assertion_id": fields.get("assertion_id"),
-             "citation_id": fields.get("citation_id"),
+             "citation_id": fields.get("citation_id"), **({"hint_id": str(fields["hint_id"])} if fields.get("hint_id") else {}),
              "ids": ids, "undo": undo, "undone": False, "outcome": outcome,
              **({"snapshot": snapshot} if snapshot else {}), **({"req_hash": req_hash} if req_hash else {})})
     if outcome == "ok" and _reconcile(op, tree_id, person_id, fields, ids):

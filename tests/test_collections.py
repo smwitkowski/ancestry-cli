@@ -284,3 +284,26 @@ def test_geneteka_marriage_row_and_extras():
     assert row["scan_url"].endswith("sy1910-kt2") and row["record_gid"] == "4654371" and row["parish_id"] == "1638" and row["indexed_by"] == "Kempisty"
     assert geneteka.search(region="zz", surname="x")["classification"] == "invalid-request"
     assert geneteka.parse_row([1890, "5", "Jan", "Kowal", cell], "B")["cells"][:2] == ["1890", "5"]
+
+
+def test_bind_to_limits_the_citation_and_plan_lists_every_binding():
+    from ancestry_cli import merge_payload as mp
+    comparison = {"RecordNodes": {"1:99": {
+        "Name": {"Tree": {"AssertionId": "N1", "Given": "Caroline", "Surname": "Lupa"}},
+        "Events": [{"Type": "Birth", "Tree": {"AssertionId": "B1", "Date": "1894"}, "Record": {"Date": "1895"}},
+                   {"Type": "Residence", "Tree": {"AssertionId": "R1", "Place": "Shamokin"}, "Record": {"Place": "Shamokin"}},
+                   {"Type": "Immigration", "Tree": {}, "Record": {"Date": "1910"}}]}}}
+    everything = mp.plan(comparison, cite_only=False)
+    assert [b["assertion_id"] for b in everything["will_bind"]] == ["N1", "B1", "R1"] and everything["will_create"][0]["type"] == "Immigration"
+    chosen = mp.plan(comparison, cite_only=True, bind_to=["R1"])
+    assert [b["assertion_id"] for b in chosen["will_bind"]] == ["R1"] and chosen["will_create"] == []
+    body = mp._build_upload_body(comparison, hint_id=None, person_gid="1:1030:2", source_gid="3:4", cite_only=True, bind_to=["R1"])
+    node = body["Nodes"]["1:99"]
+    assert [e["AssertionId"] for e in node["Events"]] == ["R1"] and node["Names"] == []
+
+
+def test_hint_decision_journal_rows_keep_the_hint_id(tmp_path, monkeypatch):
+    from ancestry_cli import journal
+    monkeypatch.setenv("ANCESTRY_CLI_JOURNAL", str(tmp_path / "j.jsonl"))
+    journal.record("hint-no", 1, 2, {"hint_id": "1016675053917"}, {"hintId": "1016675053917"})
+    assert journal._rows()[0]["hint_id"] == "1016675053917"

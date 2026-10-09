@@ -13,6 +13,10 @@ geneteka search --region 07mz --type S --surname Murawski --given Antoni --surna
 Options: `--type S|B|D` (marriages, births/baptisms, deaths/burials), `--exact`, `--parents` (also match the parents columns),
 `--parish-id N`, `--start N --length N` (the next page start is in `next`).
 
+## What changed after the first version
+
+The first version returned 0 rows for some birth searches while the site reported 1 to 4. The site's grid always sends its sort and search state; without it the filtered rows can come back empty, so those parameters are now always sent (a 1893-1898 Latawiec search went from 0 rows to 3 of 4 reported). The counters still do not match the rows: `--start 3` returned 2 rows, both of which were already in the first page. Results are also fuzzy (names matched through the parents columns). Page with `--start`, de-duplicate on `record_gid`, and never treat the counters as a count of acts.
+
 ## Reading the result
 
 - A search covers **one region**. It never means the person is not in Poland.

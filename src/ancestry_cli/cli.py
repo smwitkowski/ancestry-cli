@@ -179,7 +179,9 @@ def build_parser():
     p.add_argument("--hint-ids", help="batch: comma-separated hint ids (up to 50)")
     p.add_argument("--op", help="batch: hint-no, hint-maybe, hint-new, hint-ignore, hint-restore or accept")
     p.add_argument("--include-living", action="store_true", help="parents: do not redact a suggestion who may be living")
-    p.add_argument("--cite-only", action="store_true")
+    p.add_argument("--cite-only", action="store_true", help="accept: add no new facts; only cite existing ones")
+    p.add_argument("--bind-to", dest="bind_to", help="accept: comma-separated assertion ids; the new citation attaches ONLY to these existing facts (the dry-run lists the choices)")
+    p.add_argument("--facts", choices=("none", "names-only", "all"), default="names-only", help="parent-accept: which of the other member's facts to import")
     p.add_argument("--confirm-tree", dest="confirm_tree", type=_tree)
     p.add_argument("--force", action="store_true")
     _modes(p)
@@ -333,6 +335,7 @@ def _run(command, args):
     if command == "hint":
         from .hints import batch, command as hint_command
         ids, op = args.pop("hint_ids"), args.pop("op")
+        args["bind_to"] = [x for x in (args.get("bind_to") or "").split(",") if x] or None
         if args["action"] == "batch":
             return batch(op=op, hint_ids=(ids or "").split(","), **{k: v for k, v in args.items() if k in ("tree_id", "person_id", "cite_only", "dry_run", "confirm_tree", "force")})
         return hint_command(**args)

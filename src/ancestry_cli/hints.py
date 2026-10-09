@@ -101,7 +101,10 @@ class _Accept:
     collection_id: str
     evalv: str
     cite_only: bool
+    bind_to: tuple = None
     body: dict = None
+    plan: dict = None
+    available: list = None
     preview: dict = None
     sent: bool = False
 
@@ -204,12 +207,16 @@ def _plan(a):
     comparison = a.inner.get(f"{_BASE}/api/hintsui-api/trees/{a.tree_id}/persons/{a.person_id}/comparison/",
                              params={"sourceGid": a.source_gid, "restricttorootnode": "false", "type": "Record", "evalV": a.evalv},
                              headers=_headers(a.tree_id, a.person_id), timeout=60, allow_redirects=False, writes_ok=False)
-    a.body = merge_payload._build_upload_body(json.loads(comparison.text), hint_id=a.hint_id, person_gid=a.person_gid,
-                                              source_gid=a.source_gid, cite_only=a.cite_only)
+    data = json.loads(comparison.text)
+    a.body = merge_payload._build_upload_body(data, hint_id=a.hint_id, person_gid=a.person_gid,
+                                              source_gid=a.source_gid, cite_only=a.cite_only, bind_to=a.bind_to)
+    a.plan = merge_payload.plan(data, cite_only=a.cite_only, bind_to=a.bind_to)
+    a.available = [b["assertion_id"] for b in merge_payload.plan(data, cite_only=True)["will_bind"]]
     node = a.body["Nodes"]["1:99"]
     a.preview = {"events_cited_existing": sum(1 for e in node["Events"] if "AssertionId" in e),
                  "events_new_from_record": sum(1 for e in node["Events"] if "AssertionId" not in e),
-                 "names_cited": len(node["Names"]), "cite_only": a.cite_only}
+                 "names_cited": len(node["Names"]), "cite_only": a.cite_only,
+                 "will_bind": a.plan["will_bind"], "will_create": a.plan["will_create"], "record_family_members": a.plan["record_family_members"]}
 
 
 def _post(a, tail, payload):
@@ -282,6 +289,61 @@ def _accept_parent(a, dry_run, poll_seconds, req_hash, include_living):
             "created_new_person": True, "parent_now": added, "journal_id": journal_id}
 
 
+_KEEP = {"names-only": ("Name", "Gender"), "none": ("Name",)}
+
+
+def _trim_imported(res, tree_id, hint_id, facts):
+    """After a parent-accept: the site has copied the other member's person with all its facts. Outside the lane lock (these are
+    writes), remove the facts the caller did not ask for, flag what was kept, and leave a note saying where it all came from."""
+    from .discovery import person as read_person
+    from .ops import write
+    pid = next((p["person_id"] for p in res.get("parent_now") or [] if p.get("person_id")), None)
+    if not pid:
+        res["imported_check"] = "new person not found; check its facts by hand"
+        return res
+    got = read_person(tree_id=tree_id, person_id=int(pid), include_living=True)
+    if not got.get("ok"):
+        res["imported_check"] = "could not read the new person back; check its facts by hand"
+        return res
+    removed, kept, failed = [], [], []
+    for f in got["facts"]:
+        if facts != "all" and f["type"] not in _KEEP[facts]:
+            r = write(op="fact-remove", tree_id=tree_id, person_id=int(pid), assertion_id=f["assertion_id"], dry_run=False,
+                      confirm_tree=tree_id, force=True)
+            (removed if r.get("ok") else failed).append({"assertion_id": f["assertion_id"], "type": f["type"], "date": f["date"], "place": f["place"]})
+        else:
+            kept.append({"assertion_id": f["assertion_id"], "type": f["type"], "date": f["date"], "place": f["place"]})
+    note = (f"Created by accepting Ancestry's suggested {res['preview']['relation']} (hint {hint_id}) from another member's tree. "
+            + ("Only the name"
+               + (" and gender" if facts == "names-only" else "")
+               + " were kept; every imported date, place and event was removed. " if facts != "all" else
+               "Its dates, places and events were copied from that tree and are UNVERIFIED: do not treat them as proven. ")
+            + "Nothing here is proven until a source is attached.")
+    n = write(op="note-set", tree_id=tree_id, person_id=int(pid), dry_run=False, confirm_tree=tree_id, force=True, text=note)
+    res["facts_mode"] = facts
+    res["facts_removed"] = removed
+    res["facts_remove_failed"] = failed
+    res["imported_unverified"] = [{**k, "status": "imported_unverified"} for k in kept if facts == "all" or k["type"] not in ("Name", "Gender")]
+    res["note_set"] = bool(n.get("ok"))
+    res["new_person_family"] = {k: [m["name"] for m in v] for k, v in (got.get("family") or {}).items() if v}
+    return res
+
+
+def command(**kw):
+    """`list` shows the person's hints; `accept` accepts one; `parent-accept` accepts a suggested parent (see _trim_imported)."""
+    facts = kw.pop("facts", "names-only") if kw.get("action") == "parent-accept" else None
+    kw.pop("facts", None)
+    res = _command(**kw)
+    if facts is not None and res.get("classification") == "dry-run" and isinstance(res.get("preview"), dict):
+        res["preview"]["facts_mode"] = facts
+        res["preview"]["note"] = ("The site copies the other member's person with all its facts; after accepting, "
+                                  + ("they are all kept and flagged imported_unverified." if facts == "all" else
+                                     f"every fact except {' and '.join(_KEEP[facts])} is removed again and a note records the source."))
+    if facts is not None and res.get("classification") == "accepted-parent" and kw.get("dry_run") is not True:
+        res = _trim_imported(res, kw["tree_id"], kw.get("hint_id"), facts)
+    return res
+
+
 def _flatten(slot):
     out = []
     for m in slot:
@@ -289,9 +351,23 @@ def _flatten(slot):
     return out
 
 
+def _citations(a):
+    """{citation_id: [assertion ids]} and {assertion id: fact type} as the person's page shows them now."""
+    from .snapshots import person_data
+    page = a.inner.get(f"{_BASE}/family-tree/person/tree/{a.tree_id}/person/{a.person_id}/facts", timeout=60, allow_redirects=False, writes_ok=False)
+    pr = person_data(page.text)["person"]["PersonResearch"]
+    cites = {str(c["CitationId"]): str(c.get("AssertionIds") or "").split() for key in ("PersonSources", "UGCPersonSources") for c in (pr.get(key) or []) if c.get("CitationId")}
+    types = {str(f["AssertionId"]): f.get("TypeString") for f in pr.get("PersonFacts", []) if f.get("AssertionId")}
+    return cites, types
+
+
 def _commit(a, poll_seconds, req_hash):
     """Upload, wait, confirm. From the first POST on, a failure is an unknown outcome."""
     a.lease.check()
+    try:
+        before, _ = _citations(a)
+    except Exception:
+        before = None
     a.sent = True
     upload = json.loads(_post(a, "upload", a.body).text)
     state = _wait_for_job(a, upload.get("location"), poll_seconds)
@@ -305,18 +381,30 @@ def _commit(a, poll_seconds, req_hash):
     if not ok:
         return failure("confirmation-failed", dispatched=True, preview=a.preview, journal_id=journal_id,
                        progress={"done": ["upload", "status"], "failed_at": "confirmation"})
-    return {"ok": True, "classification": "accepted", "dispatch_attempted": True, "state": "changed", "preview": a.preview,
-            "journal_id": journal_id}
+    out = {"ok": True, "classification": "accepted", "dispatch_attempted": True, "state": "changed", "preview": a.preview,
+           "journal_id": journal_id}
+    try:        # read back what the new citation is actually bound to
+        after, types = _citations(a)
+        new = [c for c in after if before is not None and c not in before]
+        out["new_citation_ids"] = new
+        out["bound_to"] = [{"assertion_id": x, "type": types.get(x)} for c in new for x in after[c]]
+        planned = {b["assertion_id"] for b in a.plan["will_bind"]}
+        extra = [b["assertion_id"] for b in out["bound_to"] if b["assertion_id"] not in planned]
+        if extra:
+            out["warnings"] = [{"code": "bound-beyond-plan", "message": "The citation is bound to facts the dry-run did not list.", "assertion_ids": extra}]
+    except Exception:
+        out["bound_to"] = None
+    return out
 
 
-def _guards(tree_id, person_id, hint_id, cite_only, confirm_tree, force, op="hint-accept"):
+def _guards(tree_id, person_id, hint_id, cite_only, confirm_tree, force, op="hint-accept", bind_to=None):
     """The live-write guards. Returns (failure result or None, request hash)."""
     from .journal import find_duplicate, request_hash
     if not config.writable(tree_id):
         return failure("tree-not-writable"), None
     if config.needs_confirmation(tree_id, confirm_tree):
         return failure("confirm-tree-required"), None
-    req_hash = request_hash(op, tree_id, person_id, {"hint_id": hint_id, "cite_only": cite_only})
+    req_hash = request_hash(op, tree_id, person_id, {"hint_id": hint_id, "cite_only": cite_only, **({"bind_to": sorted(bind_to)} if bind_to else {})})
     duplicate = None if force else find_duplicate(req_hash)
     return (failure("duplicate-write", journal_id=duplicate) if duplicate is not None else None), req_hash
 
@@ -353,8 +441,8 @@ def batch(*, op, tree_id, person_id, hint_ids, cite_only=False, dry_run=True, co
     return out
 
 
-def command(*, action, tree_id, person_id, hint_id=None, cite_only=False, dry_run=True, bridge=None, poll_seconds=30,
-            confirm_tree=None, force=False, include_living=False):
+def _command(*, action, tree_id, person_id, hint_id=None, cite_only=False, dry_run=True, bridge=None, poll_seconds=30,
+            confirm_tree=None, force=False, include_living=False, bind_to=None, facts="names-only"):
     """`list` shows the person's hints; `accept` accepts one (dry-run unless dry_run=False)."""
     if type(tree_id) is not int or type(person_id) is not int or not config.tree_allowed(tree_id):
         return failure("configuration-error")
@@ -363,7 +451,7 @@ def command(*, action, tree_id, person_id, hint_id=None, cite_only=False, dry_ru
         return failure("hint-id-required")
     req_hash = None
     if action in ("accept", "parent-accept") and not dry_run:
-        refusal, req_hash = _guards(tree_id, person_id, hint_id, cite_only, confirm_tree, force, "hint-parent-accept" if action == "parent-accept" else "hint-accept")
+        refusal, req_hash = _guards(tree_id, person_id, hint_id, cite_only, confirm_tree, force, "hint-parent-accept" if action == "parent-accept" else "hint-accept", bind_to)
         if refusal:
             return refusal
     accept = None
@@ -396,8 +484,11 @@ def command(*, action, tree_id, person_id, hint_id=None, cite_only=False, dry_ru
             if not evalv:
                 return failure("eval-version-unresolved")
             accept = _Accept(inner, lease, tree_id, person_id, hint_id, chosen["record_id"], chosen["collection_id"],
-                             evalv.group(1), cite_only)
+                             evalv.group(1), cite_only, tuple(bind_to) if bind_to else None)
             _plan(accept)
+            missing = [x for x in (bind_to or []) if x not in accept.available]
+            if missing:
+                return failure("bind-to-not-found", unknown=missing, available=accept.available)
             if dry_run:
                 return {"ok": True, "classification": "dry-run", "dispatch_attempted": False, "record_id": accept.record_id,
                         "collection_id": accept.collection_id, "preview": accept.preview}

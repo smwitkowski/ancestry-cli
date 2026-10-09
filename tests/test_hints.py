@@ -74,7 +74,8 @@ def test_list_and_dry_run_send_nothing(env):
     assert out["ok"] and [h["hint_id"] for h in out["hints"]] == [HINT, "100000000002"]
     out = hints.command(action="accept", tree_id=TREE, person_id=PERSON, hint_id=HINT, bridge=b)
     assert out["classification"] == "dry-run" and out["preview"] == {
-        "events_cited_existing": 1, "events_new_from_record": 2, "names_cited": 1, "cite_only": False}
+        "events_cited_existing": 1, "events_new_from_record": 2, "names_cited": 1, "cite_only": False,
+        "will_bind": [], "will_create": [], "record_family_members": 0}
     assert b.posts == []
     assert hints.command(action="accept", tree_id=TREE, person_id=PERSON, hint_id="100000000002", bridge=b)["classification"] == "hint-not-found-or-not-a-record"
     assert hints.command(action="accept", tree_id=TREE, person_id=PERSON, bridge=b)["classification"] == "hint-id-required"

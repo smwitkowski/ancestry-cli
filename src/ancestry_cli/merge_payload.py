@@ -3,8 +3,31 @@ comparison response). Source: ancestry_tools._build_upload_body / _build_confirm
 from __future__ import annotations
 
 
+def plan(comparison: dict, *, cite_only: bool, bind_to=None) -> dict:
+    """What accepting would do, from the same comparison the upload is built from: the existing facts the new citation
+    attaches to (will_bind), the facts it creates (will_create) and the record's own family members (record_family)."""
+    node = comparison.get("RecordNodes", {}).get("1:99") or {}
+    allowed = {str(a) for a in bind_to} if bind_to else None
+    bind, create = [], []
+    name = ((node.get("Name") or {}).get("Tree") or {})
+    if name.get("AssertionId") and (allowed is None or str(name["AssertionId"]) in allowed):
+        bind.append({"assertion_id": str(name["AssertionId"]), "type": "Name", "tree": " ".join(x for x in (name.get("Given"), name.get("Surname")) if x)})
+    for ev in node.get("Events", []) or []:
+        tree_side, record_side = ev.get("Tree") or {}, ev.get("Record") or {}
+        if tree_side.get("AssertionId"):
+            if allowed is None or str(tree_side["AssertionId"]) in allowed:
+                bind.append({"assertion_id": str(tree_side["AssertionId"]), "type": ev.get("Type", ""),
+                             "tree": " ".join(x for x in (tree_side.get("Date"), tree_side.get("Place")) if x),
+                             "record": " ".join(x for x in (record_side.get("Date"), record_side.get("Place")) if x)})
+        elif record_side and not cite_only:
+            create.append({"type": ev.get("Type", ""), "date": record_side.get("Date"), "place": record_side.get("Place")})
+    fam = node.get("Family") or {}
+    people = [x for x in (fam.get("Father"), fam.get("Mother")) if x] + list(fam.get("Siblings") or [])
+    return {"will_bind": bind, "will_create": create, "record_family_members": len(people) + sum(len(u) for u in fam.get("FamilyUnits") or [])}
+
+
 def _build_upload_body(comparison: dict, *, hint_id: str | None, person_gid: str, source_gid: str,
-                       cite_only: bool) -> dict:
+                       cite_only: bool, bind_to=None) -> dict:
     """Transform comparison response → upload POST body.
 
     The comparison response holds the merge UI's pre-bootstrap state (existing
@@ -24,12 +47,13 @@ def _build_upload_body(comparison: dict, *, hint_id: str | None, person_gid: str
     record_node = comparison.get("RecordNodes", {}).get("1:99") or {}
     if not record_node:
         raise RuntimeError("comparison response missing RecordNodes['1:99']")
+    allowed = {str(a) for a in bind_to} if bind_to else None      # bind_to: cite only these existing facts
 
     # --- Names: cite on existing tree name (skip record-only alt surnames by default) ---
     names: list[dict] = []
     name_obj = record_node.get("Name") or {}
     tree_name = (name_obj.get("Tree") or {})
-    if tree_name.get("AssertionId"):
+    if tree_name.get("AssertionId") and (allowed is None or str(tree_name["AssertionId"]) in allowed):
         names.append({
             "Given": tree_name.get("Given", "") or "",
             "Surname": tree_name.get("Surname", "") or "",
@@ -44,6 +68,8 @@ def _build_upload_body(comparison: dict, *, hint_id: str | None, person_gid: str
         tree_side = ev.get("Tree") or {}
         record_side = ev.get("Record") or {}
         ev_type = ev.get("Type", "")
+        if tree_side.get("AssertionId") and allowed is not None and str(tree_side["AssertionId"]) not in allowed:
+            continue            # not one of the facts the caller chose
         if tree_side.get("AssertionId"):
             # Cite source on existing tree fact (don't change date/place)
             events.append({

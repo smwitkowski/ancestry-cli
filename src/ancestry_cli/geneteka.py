@@ -127,7 +127,10 @@ def search(*, region, type_="S", surname=None, given=None, surname2=None, given2
         return failure("invalid-request", problems=[{"field": "region" if region not in REGIONS else "type" if type_ not in TYPES else "name", "issue": "invalid"}])
     params = {"op": "gt", "lang": "eng", "bdm": type_, "w": region, "rid": str(parish_id or ""), "search_lastname": surname or "",
               "search_name": given or "", "search_lastname2": surname2 or "", "search_name2": given2 or "", "from_date": str(frm or ""),
-              "to_date": str(to or ""), "draw": "1", "start": str(int(start)), "length": str(int(length))}
+              "to_date": str(to or ""), "draw": "1", "start": str(int(start)), "length": str(int(length)),
+              # the site's DataTables grid always sends its sort and search state; without it the filtered rows can come back empty
+              "order[0][column]": "0", "order[0][dir]": "asc", "order[1][column]": "1", "order[1][dir]": "asc",
+              "search[value]": "", "search[regex]": "false"}
     if exact:
         params["exac"] = "1"
     if parents:

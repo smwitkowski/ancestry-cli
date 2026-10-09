@@ -129,6 +129,12 @@ Work-finding and hints:
 
 Media: `write media-link-fact --person P --assertion FACT --set media_id=M` links a media item already in the tree to one of the person's facts (the fact type and gender are read from the page; the site answers 202 and applies it a moment later; Name, Gender and Family Event facts are refused because the site rejects them). Unlinking is not tooled.
 
+Accepting hints carefully:
+- `hint accept` dry-run lists everything it will do: `will_bind` (every existing fact the new citation attaches to, with the tree's and the record's values), `will_create` (new facts it adds) and `record_family_members`. `--cite-only` adds no new facts. `--bind-to ID[,ID]` attaches the citation ONLY to those existing facts (ids come from `will_bind`; an id outside it is refused as `bind-to-not-found`). The live result reports `bound_to` (read back from the page) and warns with `bound-beyond-plan` if the citation landed anywhere the dry-run did not list.
+- `hint parent-accept --facts names-only|none|all` (default names-only). The site copies the other member's person with every fact; unless `all` is chosen the CLI then removes every fact except the name (and gender) from the NEW person and sets a note on that person saying where it came from. With `all`, each kept fact is returned as `imported_unverified` and the note says so. The result lists `facts_removed`, `imported_unverified`, `note_set` and `new_person_family`.
+- `person-remove` reads back each relative's page and reports `still_linked` and `clean`.
+- `hint-maybe`/`hint-no` journal rows carry `hint_id`.
+
 ### `ancestry read hints --tree T --person P`, `ancestry read record --collection C --record R`
 Hints page data and a record's details. **Take record and collection ids from a live search result**, not from examples.
 ### `ancestry read list [GROUP]` / `ancestry read get NAME [--tree T --person P --path k=v --param k=v] [--full]`

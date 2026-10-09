@@ -348,12 +348,44 @@ def _explicitly_rejected(status, data):
                                        or (type(data.get("statusCode")) is int and data["statusCode"] >= 400))
 
 
+def _members(family):
+    out = []
+    for role, members in (family or {}).items():
+        for m in members or []:
+            for x in (m if isinstance(m, list) else [m]):
+                if isinstance(x, dict) and str(x.get("Id")) not in ("0", "None"):
+                    out.append((role, str(x["Id"])))
+    return out
+
+
+def _removal_readback(w, limit=12):
+    """After a person is removed: each relative's page must no longer list them, as a parent, spouse, child or sibling."""
+    removed = str(w.person_id)
+    relatives = sorted({pid for _role, pid in _members(w.before.get("family")) if pid != removed})
+    still, unreadable = [], []
+    for pid in relatives[:limit]:
+        page = w.inner.get(f"{_BASE}/family-tree/person/tree/{w.tree_id}/person/{pid}/facts", timeout=30, allow_redirects=False, writes_ok=False)
+        try:
+            pr = person_data(page.text)["person"]["PersonResearch"]
+        except Exception:
+            unreadable.append(pid)
+            continue
+        fam = pr.get("PersonFamily") or {}
+        linked = [role.lower() for role, mid in _members(fam) if mid == removed]
+        if linked:
+            still.append({"person_id": pid, "still_listed_as": linked})
+    return {"relatives_checked": len(relatives[:limit]), "relatives_total": len(relatives), "still_linked": still,
+            "unreadable": unreadable, "clean": not still and not unreadable and len(relatives) <= limit}
+
+
 def _readback(w, fields):
     """What changed, as ids and field names (never values)."""
     try:
         if w.op == "note-set":
             return {"note_matches": _read_note(w) == fields["text"]}
-        if w.before is not None and w.op != "person-remove":
+        if w.op == "person-remove" and w.before is not None:
+            return _removal_readback(w)
+        if w.before is not None:
             after = w.inner.get(w.facts_url, timeout=30, allow_redirects=False, writes_ok=False)
             return snapshot_diff(w.before, snapshot_from_page(after.text, w.tree_id, w.person_id))
     except Exception:
