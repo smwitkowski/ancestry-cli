@@ -271,3 +271,16 @@ def test_hint_card_content_duplicate_facts_and_journal_summary(tmp_path, monkeyp
     out = journal.summary(since="2026-10-09")
     assert out["writes"] == 2 and out["new_people"][0]["person_id"] == "77" and out["unknown_outcomes"] == [2]
     assert out["detaches_and_removals"][0]["op"] == "fact-detach-source"
+
+
+def test_geneteka_marriage_row_and_extras():
+    from ancestry_cli import geneteka
+    cell = ('<img src="images/i.png" title="&#013;Place: Zaremby " ><a href="http://x.example/ap" target="_blank"><img src="images/z.png" '
+            'title="Miejsce przechowywania ksiąg: &#013;Archiwum &#013;Lomza"></a><a href="u"><img src="images/a.png" title="Indeks dodał: Kempisty"></a>'
+            '<a class="gt" target ="doc" href="https://metryki.genealodzy.pl/id689-sy1910-kt2"><img src="images/s.png"></a>'
+            '<a href="fix.php?gid=4654371&bdm=S&w=07mz&rid=1638&lang=eng"><img src="images/fix.png"></a>')
+    row = geneteka.parse_row([1910, "2", "Antoni ", "Murawski", "Maciej, Marcjanna", "Marianna ", "Sokolowska", "Mateusz, Marianna", "Zaremby", cell], "S")
+    assert row["groom"]["surname"] == "Murawski" and row["bride"]["given"] == "Marianna" and row["parish"] == "Zaremby"
+    assert row["scan_url"].endswith("sy1910-kt2") and row["record_gid"] == "4654371" and row["parish_id"] == "1638" and row["indexed_by"] == "Kempisty"
+    assert geneteka.search(region="zz", surname="x")["classification"] == "invalid-request"
+    assert geneteka.parse_row([1890, "5", "Jan", "Kowal", cell], "B")["cells"][:2] == ["1890", "5"]

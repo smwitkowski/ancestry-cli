@@ -15,6 +15,7 @@ ancestry = "ancestry_cli.cli:main"
 familysearch = "ancestry_cli.familysearch:main"
 newspapers = "ancestry_cli.papers:main"
 findagrave = "ancestry_cli.findagrave:main"
+geneteka = "ancestry_cli.geneteka:main"
 
 [dependency-groups]
 dev = ["pytest>=9.1.1"]

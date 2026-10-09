@@ -65,6 +65,8 @@ Exit codes: `0` ok, `1` failed with nothing changed, `2` bad usage, `3` state un
 | `image-unavailable` | yes | no | The record image could not be fetched (no image URL on the viewer page, or no image rights). Check the collection and image ids from a search result; nothing was changed. | run: `ancestry doctor` |
 | `newspapers-tab-required` | no | yes | Open https://www.newspapers.com in one tab of the Chrome on this port and sign in by hand (Ancestry sign-in works). Leave the Ancestry tab alone. | human: Open Newspapers.com in a tab and sign in.<br>run: `ancestry doctor` *(after-human)* |
 | `newspapers-tab-ambiguous` | no | yes | More than one Newspapers.com tab is open; leave exactly one. | human: Close the extra Newspapers.com tabs. |
+| `geneteka-unavailable` | yes | no | Geneteka did not answer (see status). Wait; the site asks for a 120 second gap between requests. | retry: retry the same command |
+| `geneteka-blocked` | no | no | Geneteka refused the request (403 or 429). Do not retry in a loop; wait several minutes. |  |
 | `findagrave-search-not-allowed` | no | no | Find a Grave's robots.txt disallows automated memorial search, so this tool does not search. Find the memorial id in your browser or from a citation, then use `findagrave memorial ID`. |  |
 | `findagrave-check-required` | no | no | Find a Grave refused the request (403 or a bot check). It has been seen to refuse Python builds with an old OpenSSL (openssl in this result; 3.6 works, 3.0 does not): `uv tool install --force --reinstall --python 3.13 .` uses a newer one. Otherwise use the site in your own browser; do not retry in a loop. |  |
 | `findagrave-rate-limited` | yes | no | Find a Grave is rate-limiting. Wait a few minutes, then retry. | retry: retry the same command |

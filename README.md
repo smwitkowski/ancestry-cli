@@ -77,6 +77,8 @@ see what can be written. Every command prints one JSON object; follow `state` an
 
 `findagrave memorial ID` reads a public memorial (dates, cemetery, bio, family links) and `findagrave photo` saves its photos. No search (robots.txt). See [docs/findagrave.md](docs/findagrave.md).
 
+`geneteka search --region 07mz --type S --surname Murawski --given Antoni --from 1908 --to 1912` searches one region of the Polish Geneteka parish indexes (marriages, births, deaths) at the site's requested 120 second pace, with a 24 hour cache. Rows carry the parish id, indexer, holding archive and the link to the scanned register. See [docs/geneteka.md](docs/geneteka.md).
+
 ## FamilySearch (read-only)
 
 The package also installs `familysearch`, which reads FamilySearch records, tree persons, film catalog entries and record images through a
