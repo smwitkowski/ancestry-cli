@@ -241,7 +241,6 @@ def _journal(a, outcome, req_hash=None, op="hint-accept"):
 def _accept_parent(a, dry_run, poll_seconds, req_hash, include_living):
     """Accept a suggested parent: Ancestry copies the other tree's person into this tree and links them as the father or mother.
     This CREATES a new person (it never merges into an existing one); the result reports the new id when Ancestry names it."""
-    from .discovery import person as read_person
     from .snapshots import person_data
     inner, tree_id, person_id, hint_id, evalv = a.inner, a.tree_id, a.person_id, a.hint_id, a.evalv
     page = inner.get(f"{_BASE}/family-tree/person/tree/{tree_id}/person/{person_id}/facts", timeout=60, allow_redirects=False, writes_ok=False)
@@ -276,8 +275,9 @@ def _accept_parent(a, dry_run, poll_seconds, req_hash, include_living):
     if not ok:
         return failure("confirmation-failed", dispatched=True, preview=preview, journal_id=journal_id,
                        progress={"done": ["upload", "status"], "failed_at": "confirmation"})
-    after = read_person(tree_id=tree_id, person_id=person_id, include_living=True)
-    added = (after.get("family") or {}).get("fathers" if role == "father" else "mothers") or []
+    again = inner.get(f"{_BASE}/family-tree/person/tree/{tree_id}/person/{person_id}/facts", timeout=60, allow_redirects=False, writes_ok=False)
+    fam = person_data(again.text)["person"]["PersonResearch"].get("PersonFamily") or {}
+    added = [{"person_id": str(m.get("Id")), "name": m.get("FullName")} for m in _flatten(fam.get("Fathers" if role == "father" else "Mothers") or [])]   # read inside the open lane: a second lock would deadlock
     return {"ok": True, "classification": "accepted-parent", "dispatch_attempted": True, "state": "changed", "preview": preview,
             "created_new_person": True, "parent_now": added, "journal_id": journal_id}
 
