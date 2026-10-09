@@ -39,6 +39,7 @@ Risk classes:
 | [`tag-remove`](#tag-remove) | destructive | `tags` | Remove MyTreeTags from a person. |
 | [`media-upload`](#media-upload) | additive | `file`, `title` | Upload an image and attach it to a person. |
 | [`media-edit`](#media-edit) | edit | `media_id` | Change a media item's title, date, location or description. |
+| [`media-link-fact`](#media-link-fact) | edit | `--assertion`, `media_id` | Link a media item (already in the tree) to one of this person's facts. |
 | [`media-remove`](#media-remove) | destructive | `media_id` | Permanently delete a media item from the tree. |
 | [`hint-maybe`](#hint-maybe) | hint-state | `hint_id` | Mark a hint Maybe (Undecided). |
 | [`hint-no`](#hint-no) | hint-state | `hint_id` | Mark a hint No (rejected). |
@@ -373,6 +374,20 @@ Change a media item's title, date, location or description.
 
 ```bash
 ancestry write media-edit --tree TREE --person PERSON --set media_id=00000000-0000-4000-8000-000000000002 --set date='1 Jan 1900' --set location='Baltimore, Maryland, USA' --confirm-tree TREE --live
+```
+
+## media-link-fact
+
+Link a media item (already in the tree) to one of this person's facts.
+
+- **Risk:** edit
+- **Required:** `--assertion`, `media_id`
+- **Optional:** -
+- **Undo:** not undoable here; unlink it in the Ancestry UI
+- **Notes:** The fact type and the person's gender are read from the page. The site accepts the job (HTTP 202) and applies it a moment later; read `ancestry person` to see the fact's media count.
+
+```bash
+ancestry write media-link-fact --tree TREE --person PERSON --assertion 700000000001 --set media_id=00000000-0000-4000-8000-000000000002 --confirm-tree TREE --live
 ```
 
 ## media-remove

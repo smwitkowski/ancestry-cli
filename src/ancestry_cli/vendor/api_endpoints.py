@@ -720,6 +720,14 @@ ENDPOINTS = [
         "notes": "Edit a media item's title, date, location or description (the media viewer's details panel). Fields not sent are unchanged.",
     },
     {
+        "group": "writes", "name": "media_link_fact", "method": "POST",
+        "path": "/api/media/viewer/api/trees/{treeId}/media/{mediaId}/life-facts",
+        "body": {"lifeFactType": "Burial", "persons": [{"personGid": "{personId}:1030:{treeId}", "matchType": "add_to_existing",
+                                                          "existingFactId": "", "gender": "Female"}]},
+        "kind": "json", "source": "media viewer bundle (photo insights) 2026-10-09; verified live", "side_effect": True,
+        "notes": "Link a media item to an existing fact of a person. Answers 202 {statusUrl}; the link appears a moment later.",
+    },
+    {
         "group": "writes", "name": "media_delete", "method": "DELETE",
         "path": "/api/media/viewer/api/trees/{treeId}/media/{mediaId}",
         "kind": "json", "source": "genealogy c51 devtools HAR 2026-10-06", "side_effect": True,

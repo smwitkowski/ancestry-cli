@@ -227,6 +227,14 @@ def _prepare(w, fields):
     elif w.op == "relative-link" and fields.get("relation") in ("Son", "Daughter", "Brother", "Sister"):
         fields.setdefault("anchor_gender", _anchor_gender(w.page_text))
         fields["father_id"], fields["mother_id"] = _parent_set(w, fields)
+    elif w.op == "media-link-fact":
+        fact = next((f for f in person_data(w.page_text)["person"]["PersonResearch"].get("PersonFacts", []) if str(f.get("AssertionId")) == str(fields.get("assertion_id"))), None)
+        if fact is None:
+            raise _Refused("fact-not-found")
+        fields["life_fact_type"] = fact.get("TypeString") or "Residence"
+        if fields["life_fact_type"] in ("Name", "Gender") or fields["life_fact_type"].startswith("Family"):
+            raise _Refused("media-link-unsupported-fact")          # the site answers 500 for these types
+        fields["anchor_gender"] = _anchor_gender(w.page_text)
     elif w.op == "source-delete":
         _check_source_title(w, fields)
     elif w.op == "source-edit":
@@ -292,6 +300,9 @@ def _dispatch(w, req, fields):
     url = _BASE + req["path"]
     headers = {"Content-Type": "application/json", "Accept": "application/json", "Referer": w.facts_url,
                "Origin": _BASE, "X-Requested-With": "XMLHttpRequest"}
+    if w.op == "media-link-fact":       # the viewer's own request: it comes from the media viewer page and is not an XHR-marked call
+        headers["Referer"] = f"{_BASE}/mediaui-viewer/tree/{w.tree_id}/person/{w.person_id}/media/{fields['media_id']}"
+        headers.pop("X-Requested-With")
     if req.get("text_plain"):
         headers["Content-Type"] = "text/plain;charset=UTF-8"
     w.lease.check()

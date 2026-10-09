@@ -144,6 +144,7 @@ ERRORS = {
     "hint-id-required": Err(False, False, "Pass --hint-id (see `ancestry hint list`).", _LIST_HINTS),
     "hint-not-found-or-not-a-parent": Err(False, False, "That hint is not a suggested father or mother of this person. List them with `ancestry hint parents`.", [_run("ancestry", "hint", "parents", "--tree", "{tree_id}", "--person", "{person_id}")]),
     "familysearch-collection-not-numeric": Err(False, False, "Record search filters by a NUMERIC collection id. Ids like M9J1-SZ4 (from `familysearch fulltext`) name a full-text collection and only work with `fulltext --collection`.", [_edit("Use a numeric id, or run the same words with `familysearch fulltext --collection`.")]),
+    "media-link-unsupported-fact": Err(False, False, "The site cannot link media to Name, Gender or Family Event facts. Nothing was sent. Link it to another fact of the person, or in the Ancestry UI.", [_edit("Choose a different fact.")]),
     "parent-slot-occupied": Err(False, False, "The person already has a parent in that slot. Nothing was sent; link or compare by hand if the suggestion is a better match.", [_edit("Review the existing parent first.")]),
     "hint-not-found-or-not-a-record": Err(False, False, "That hint is not among the person's new hints, or it has no record. List them with `ancestry hint list`.", _LIST_HINTS),
     "missing-arguments": Err(False, False, "Required options for this read are missing. See `ancestry read --help`.", [_edit("Provide the required options for this read.")]),

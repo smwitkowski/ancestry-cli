@@ -452,6 +452,21 @@ def _media_edit(c, f):
     return dict(method="PUT", path=f"/api/media/viewer/api/trees/{c.tree_id}/media/{f['media_id']}", body={**body, "type": "p"})
 
 
+@operation("media-link-fact", summary="Link a media item (already in the tree) to one of this person's facts.", risk=EDIT,
+           required=("--assertion", "media_id"), undo="not undoable here; unlink it in the Ancestry UI",
+           example="--assertion 700000000001 --set media_id=00000000-0000-4000-8000-000000000002",
+           notes="The fact type and the person's gender are read from the page. The site accepts the job (HTTP 202) and applies it a moment later; "
+                 "read `ancestry person` to see the fact's media count.",
+           success=lambda d: isinstance(d, dict) and bool(d.get("statusUrl")))
+def _media_link_fact(c, f):
+    _need(_UUID.match(str(f.get("media_id", ""))) and _ID.match(str(c.assertion_id)))
+    person = {"personGid": f"{c.person_id}:1030:{c.tree_id}", "matchType": "add_to_existing", "existingFactId": str(c.assertion_id)}
+    if f.get("anchor_gender"):
+        person["gender"] = f["anchor_gender"]
+    return dict(method="POST", path=f"/api/media/viewer/api/trees/{c.tree_id}/media/{f['media_id']}/life-facts",
+                body={"lifeFactType": f.get("life_fact_type", "Residence"), "persons": [person]})
+
+
 @operation("media-remove", summary="Permanently delete a media item from the tree.", risk=DESTRUCTIVE, required=("media_id",),
            undo="not undoable", example="--set media_id=00000000-0000-4000-8000-000000000002",
            success=lambda d: d == {} or (isinstance(d, dict) and set(d) == {"message"}))      # the site now answers {"message": ...}
@@ -579,7 +594,8 @@ def _write(*, op, tree_id, person_id, dry_run, confirm_tree, force, **fields):
     # dry-run: fill what the live sender reads from the page, so the request shape can be shown
     placeholders = {"person-remove": {"name": "<read from the page>"}, "fact-edit": {"eventType": "<current value>"},
                     "relative-add": {"name_id": "0", "gender_id": "0", "father_id": "0", "mother_id": "0"},
-                    "relative-link": {"father_id": "0", "mother_id": "0"}}.get(op, {})
+                    "relative-link": {"father_id": "0", "mother_id": "0"},
+                    "media-link-fact": {"life_fact_type": "Residence", "anchor_gender": "Female"}}.get(op, {})
     fields = {**fields, **{k: v for k, v in placeholders.items() if not fields.get(k)}}
     try:
         req = build(op, tree_id=tree_id, person_id=person_id, **fields)

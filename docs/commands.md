@@ -127,6 +127,8 @@ Work-finding and hints:
 - `ancestry journal summary [--since 2026-10-09] [--names] [--tree T]`: writes grouped by op and person, new people, removals and detaches, failed and unknown outcomes.
 - `ancestry person` also returns `duplicate_facts` (a one-per-life fact twice, or any fact twice on one date). Reporting only.
 
+Media: `write media-link-fact --person P --assertion FACT --set media_id=M` links a media item already in the tree to one of the person's facts (the fact type and gender are read from the page; the site answers 202 and applies it a moment later; Name, Gender and Family Event facts are refused because the site rejects them). Unlinking is not tooled.
+
 ### `ancestry read hints --tree T --person P`, `ancestry read record --collection C --record R`
 Hints page data and a record's details. **Take record and collection ids from a live search result**, not from examples.
 ### `ancestry read list [GROUP]` / `ancestry read get NAME [--tree T --person P --path k=v --param k=v] [--full]`
