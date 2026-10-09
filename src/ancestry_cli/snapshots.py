@@ -42,7 +42,7 @@ def snapshot_from_page(page_text, tree_id, person_id):
     return {"tree_id": tree_id, "person_id": person_id, "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "name": pr.get("PersonFullName"), "living": pr.get("IsPersonLiving"),
             "facts": [{k: f.get(k) for k in _FACT_KEYS} | {"Value": f.get("Value")} for f in pr.get("PersonFacts", [])],
-            "sources": [{**{k: s.get(k) for k in ("CitationId", "AssertionIds", "Title")}, "custom": custom, "SourceId": s.get("SourceId") or None}
+            "sources": [{**{k: s.get(k) for k in ("CitationId", "AssertionIds", "Title", "Detail", "RecordId", "ViewRecordUrl")}, "custom": custom, "SourceId": s.get("SourceId") or None}
                         for custom, key in ((False, "PersonSources"), (True, "UGCPersonSources")) for s in (pr.get(key) or [])],
             "weblinks": pr.get("PersonWebLinks"), "family": pr.get("PersonFamily")}
 

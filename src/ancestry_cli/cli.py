@@ -117,6 +117,8 @@ def build_parser():
     p.add_argument("--path", dest="path_params", action="append", default=[], metavar="KEY=VALUE")
     p.add_argument("--param", dest="params", action="append", default=[], metavar="KEY=VALUE")
     p.add_argument("--full", action="store_true", help="return the data, not just its shape")
+    p.add_argument("--offset", type=int, default=0, help="with --full on a text page: start at this character (see next_offset)")
+    p.add_argument("--max-chars", dest="max_chars", type=int, default=200_000, help="with --full on a text page: characters per page")
     for option in ("given", "surname", "birth", "death", "location"):
         p.add_argument("--" + option)
     p.add_argument("--collection", type=int)

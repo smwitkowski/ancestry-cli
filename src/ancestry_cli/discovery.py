@@ -173,5 +173,6 @@ def person(*, tree_id, person_id, include_living=False):
         return {**base, "name": snap["name"], "facts": facts, "sources": len(snap["sources"]),
                 "citations": [{"citation_id": str(s["CitationId"]), "source_id": s.get("SourceId"), "custom": s.get("custom", False),
                                "title": s.get("Title"),
+                               "detail": s.get("Detail"), "record_id": s.get("RecordId") or None, "url": s.get("ViewRecordUrl"),
                                "fact_ids": str(s.get("AssertionIds") or "").split()} for s in snap["sources"] if s.get("CitationId")], "family": family}
     return guarded(run)

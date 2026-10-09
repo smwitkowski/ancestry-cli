@@ -81,7 +81,7 @@ def _preloaded_state(text):
     return obj
 
 
-def _call(endpoint, values, params, full, tree_id, person_id, bridge):
+def _call(endpoint, values, params, full, tree_id, person_id, bridge, offset=0, max_chars=200_000):
     with rt.lock("ancestry"):
         lease = rt.open_lane(bridge)
         inner = bridge.ChromeBrowserSession(cdp_url=lease.base, target_id=lease.target_id)
@@ -95,7 +95,9 @@ def _call(endpoint, values, params, full, tree_id, person_id, bridge):
         body = json.loads(text) if not str(endpoint.get("kind", "")).startswith("html") else _preloaded_state(text)
         out = {"body": body} if full else {"shape": shape(body)}
     except ValueError:
-        out = {"text": text[:200_000]} if full else {"text_length": len(text)}
+        out = ({"text": text[offset:offset + max_chars], "text_length": len(text), "offset": offset,
+                "truncated": offset + max_chars < len(text), "next_offset": offset + max_chars if offset + max_chars < len(text) else None}
+               if full else {"text_length": len(text)})
     ok = isinstance(status, int) and 200 <= status < 300
     code = None if ok else classify_preflight(status, text)
     if code == "bot-challenge":
@@ -107,7 +109,7 @@ def _call(endpoint, values, params, full, tree_id, person_id, bridge):
 
 def read(*, action, name=None, tree_id=None, person_id=None, path_params=None, params=None, full=False, bridge=None,
          given=None, surname=None, birth=None, death=None, location=None, collection=None, record_id=None, counts=False,
-         spouse=None, child=None):
+         spouse=None, child=None, offset=0, max_chars=200_000):
     searched_collection = False
     if action in ("search", "hints", "record"):
         plan = _named(action, given=given, surname=surname, birth=birth, death=death, location=location,
@@ -138,7 +140,7 @@ def read(*, action, name=None, tree_id=None, person_id=None, path_params=None, p
         values.setdefault("personId", str(person_id))
     try:
         with rt.quiet():
-            out = _call(endpoint, values, params, full, tree_id, person_id, bridge)
+            out = _call(endpoint, values, params, full, tree_id, person_id, bridge, offset, max_chars)
         body = out.get("body") if isinstance(out, dict) else None
         if searched_collection and isinstance(body, dict) and (body.get("results") or {}).get("results"):
             inner = body["results"]            # normalise to the shape a collection search always returned
