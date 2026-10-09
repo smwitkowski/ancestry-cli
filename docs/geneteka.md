@@ -20,7 +20,7 @@ Options: `--type S|B|D` (marriages, births/baptisms, deaths/burials), `--exact`,
   They have been seen to disagree (31 reported, 8 returned for a Mazowieckie marriage search). Treat a short or empty result as "not
   indexed here, under these spellings", never as proof an act does not exist.
 - Marriage (`S`) rows are named: `year`, `act`, `groom` and `bride` (`given`, `surname`, `parents`) and `parish`. Birth and death rows keep
-  the raw `cells` because their column layout has not been confirmed.
+  the raw `cells`. A births row was seen as year, act, child's given name, surname, father's name, mother's given name and surname, then two place columns; read the site's own column headings before relying on that order.
 - Every row adds, when the site gives them: `details` (place or remarks), `archive` (where the books are held), `indexed_by`,
   `scan_url` (the scanned register on metryki.genealodzy.pl), `record_gid` and `parish_id`. The row is an index entry, so it is a lead: read
   the scan before joining it to anyone.
